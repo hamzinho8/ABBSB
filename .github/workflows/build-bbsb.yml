@@ -1,0 +1,150 @@
+name: BlackBerry OS 5 Build
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+
+    - name: ☕ Setup Java 7 (32-bit requis pour RAPC)
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'zulu'
+        java-version: '7'
+        architecture: x86
+
+    - name: 🔑 Patch Registry for BlackBerry Compiler
+      shell: powershell
+      run: |
+        Write-Host "Configuration des clés de registre Java pour RAPC et l'installeur..."
+        $javaPath = $env:JAVA_HOME
+        Write-Host "JAVA_HOME détecté : $javaPath"
+        
+        # Ajout du binaire Java au PATH de la session et de GitHub Actions
+        Add-Content -Path $env:GITHUB_PATH -Value "$javaPath\bin"
+        
+        $versions = @("1.6", "1.7", "1.8")
+        $rootKeys = @("HKLM:\SOFTWARE\JavaSoft", "HKLM:\SOFTWARE\Wow6432Node\JavaSoft")
+        
+        foreach ($root in $rootKeys) {
+            foreach ($type in @("Java Development Kit", "Java Runtime Environment")) {
+                $typePath = "$root\$type"
+                New-Item -Path $typePath -Force | Out-Null
+                New-ItemProperty -Path $typePath -Name "CurrentVersion" -Value "1.7" -Force | Out-Null
+                
+                foreach ($ver in $versions) {
+                    $verPath = "$typePath\$ver"
+                    New-Item -Path $verPath -Force | Out-Null
+                    New-ItemProperty -Path $verPath -Name "JavaHome" -Value $javaPath -Force | Out-Null
+                    New-ItemProperty -Path $verPath -Name "RuntimeLib" -Value "$javaPath\bin\client\jvm.dll" -Force -ErrorAction SilentlyContinue | Out-Null
+                }
+            }
+        }
+        Write-Host "Clés de registre Java créées avec succès."
+
+    - name: 🛠️ Setup Apache Ant
+      shell: powershell
+      run: |
+        Write-Host "Installation d'Apache Ant..."
+        choco install ant -y --no-progress
+        $antBat = Get-ChildItem -Path "C:\ProgramData\chocolatey" -Filter "ant.bat" -Recurse | Select-Object -First 1
+        if ($antBat) {
+            Write-Host "Ant trouvé dans : $($antBat.Directory.FullName)"
+            Add-Content -Path $env:GITHUB_PATH -Value $antBat.Directory.FullName
+        }
+        Add-Content -Path $env:GITHUB_PATH -Value "C:\ProgramData\chocolatey\bin"
+
+    - name: 🚀 Téléchargement du JDE 5.0.0
+      shell: powershell
+      run: |
+        $url = "https://archive.org/download/blackberry-jde/BlackBerry_JDE_5.0.0.exe"
+        $exePath = "C:\BlackBerry_JDE_5.0.0.exe"
+        Write-Host "Téléchargement du JDE 5.0.0 depuis archive.org..."
+        Invoke-WebRequest -Uri $url -OutFile $exePath
+        Write-Host "Téléchargement terminé."
+
+    - name: 📦 Extraction Silencieuse (Advanced Installer)
+      shell: powershell
+      run: |
+        $extractPath = "C:\JDE_Extract"
+        $finalJdePath = "C:\BlackBerry_JDE"
+        New-Item -ItemType Directory -Force -Path $extractPath | Out-Null
+        
+        Write-Host "1. Extraction de l'EXE (Advanced Installer)..."
+        $process = Start-Process -FilePath "C:\BlackBerry_JDE_5.0.0.exe" -ArgumentList "/extract", "`"$extractPath`"" -PassThru -Wait
+        
+        Write-Host "Code de retour de l'extraction : $($process.ExitCode)"
+        
+        $msiFile = Get-ChildItem -Path $extractPath -Filter "*.msi" -Recurse | Select-Object -First 1
+        if (-not $msiFile) {
+            Write-Error "Le fichier MSI n'a pas pu être extrait. Le dossier contient :"
+            Get-ChildItem -Path $extractPath -Recurse
+            exit 1
+        }
+        Write-Host "MSI extrait avec succès : $($msiFile.FullName)"
+        
+        Write-Host "2. Installation Administrative (Décompression pure)..."
+        $msiProcess = Start-Process -FilePath "msiexec.exe" -ArgumentList "/a", "`"$($msiFile.FullName)`"", "/qn", "TARGETDIR=`"$finalJdePath`"" -PassThru -Wait
+        Write-Host "Code de retour MSI : $($msiProcess.ExitCode)"
+        Write-Host "Décompression terminée."
+
+    - name: 🔍 Configuration du JDE
+      shell: powershell
+      run: |
+        Write-Host "Recherche des outils de compilation..."
+        $rapcExe = Get-ChildItem -Path "C:\BlackBerry_JDE" -Filter "rapc.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+        
+        if ($rapcExe) {
+            $jdeHome = $rapcExe.Directory.Parent.FullName
+            $binDir = $rapcExe.Directory.FullName
+            Write-Host "Outils trouvés dans : $jdeHome"
+            Write-Host "Dossier bin : $binDir"
+            Add-Content -Path $env:GITHUB_ENV -Value "BLACKBERRY_JDE_HOME=$jdeHome"
+            Add-Content -Path $env:GITHUB_PATH -Value $binDir
+        } else {
+            Write-Error "Échec : rapc.exe introuvable."
+            exit 1
+        }
+
+    - name: ⚙️ Compilation du projet BlackBerry (Curve 9300)
+      shell: powershell
+      run: |
+        Write-Host "Lancement de la compilation avec BLACKBERRY_JDE_HOME=$env:BLACKBERRY_JDE_HOME"
+        Set-Location blackberry
+        
+        # Exécution de Ant avec affichage direct et enregistrement de la sortie
+        & ant build 2>&1 | Tee-Object -FilePath "rapc_output.txt"
+        
+        # Vérification stricte de la création du fichier .cod
+        $codFiles = Get-ChildItem -Filter "*.cod"
+        if (-not $codFiles) {
+            Write-Error "ÉCHEC CRITIQUE : Aucun fichier .cod n'a été produit !"
+            exit 1
+        }
+        
+        Write-Host "Compilation réussie ! Fichiers générés :"
+        Get-ChildItem -Include "*.cod", "*.jad", "*.alx", "*.jar" | Format-Table Name, Length
+        
+        # Génération du rapport de sécurité
+        Select-String -Pattern "requires signing|Warning!:" -Path "rapc_output.txt" | Out-File "security-api-report.txt" -Encoding utf8
+        Write-Host "Rapport de sécurité généré."
+
+    - name: 📦 Sauvegarde des fichiers d'installation BlackBerry
+      uses: actions/upload-artifact@v4
+      with:
+        name: BBSB_BlackBerry_Curve_9300_v1.0.6
+        path: |
+          blackberry/*.cod
+          blackberry/*.jad
+          blackberry/*.alx
+          blackberry/*.jar
+          blackberry/security-api-report.txt
+          blackberry/rapc_output.txt
+        if-no-files-found: error

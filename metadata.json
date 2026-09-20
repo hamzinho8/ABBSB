@@ -1,0 +1,8 @@
+{
+  "name": "BBSB",
+  "description": "BlackBerry SmartBridge (BBSB) companion application build system for BlackBerry Curve 9300 and OS 5.0+",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

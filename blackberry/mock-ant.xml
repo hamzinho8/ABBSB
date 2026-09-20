@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="Mock" default="test" basedir=".">
+    <target name="test">
+        <path id="src.files">
+            <fileset dir="." includes="src/**/*.java"/>
+            <fileset dir="." includes="icon.png"/>
+        </path>
+        <pathconvert property="src.list" refid="src.files" pathsep=" ">
+            <map from="${basedir}/" to=""/>
+            <map from="${basedir}\" to=""/>
+        </pathconvert>
+        <echo message="SRC LIST: ${src.list}"/>
+    </target>
+</project>

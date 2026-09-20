@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="BBSmartBridge" default="build" basedir=".">
+    <property environment="env"/>
+    
+    <property name="jde.home" value="${env.BLACKBERRY_JDE_HOME}"/>
+    
+    <target name="check-env">
+        <fail message="BLACKBERRY_JDE_HOME is not set. Please set it to your JDE installation path." unless="env.BLACKBERRY_JDE_HOME"/>
+    </target>
+
+    <target name="generate-rapc">
+        <echo file="BBSmartBridge.rapc">MIDlet-Name: BBSmartBridge
+MIDlet-Version: 1.0.6
+MIDlet-Vendor: Hamza
+MIDlet-Description: Android Bluetooth Companion for BlackBerry
+MIDlet-Jar-URL: BBSmartBridge.jar
+MIDlet-Jar-Size: 0
+MicroEdition-Profile: MIDP-2.0
+MicroEdition-Configuration: CLDC-1.1
+MIDlet-1: BBSmartBridge,icon.png,com.hamza.blackberrybridge.SmartBridgeApp
+RIM-MIDlet-Flags-1: 0</echo>
+    </target>
+    
+    <target name="generate-alx">
+        <echo file="BBSmartBridge.alx">&lt;loader version="1.0"&gt;
+    &lt;application id="BBSmartBridge"&gt;
+        &lt;name&gt;SmartBridge&lt;/name&gt;
+        &lt;description&gt;Android Bluetooth Companion for BlackBerry&lt;/description&gt;
+        &lt;version&gt;1.0.6&lt;/version&gt;
+        &lt;vendor&gt;Hamza&lt;/vendor&gt;
+        &lt;copyright&gt;Copyright (c) 2024 Hamza&lt;/copyright&gt;
+        &lt;fileset Java="1.54" _blackberryVersion="[5.0.0)"&gt;
+            &lt;directory&gt;&lt;/directory&gt;
+            &lt;files&gt;BBSmartBridge.cod&lt;/files&gt;
+        &lt;/fileset&gt;
+    &lt;/application&gt;
+&lt;/loader&gt;</echo>
+    </target>
+
+    <target name="check-cod">
+        <available file="BBSmartBridge.cod" property="cod.exists"/>
+    </target>
+
+    <!-- Strategy 1: RAPC on BBSmartBridge.jdp via rapc.exe -->
+    <target name="build-jdp" depends="check-env, check-cod, generate-alx" unless="cod.exists">
+        <echo message="[Strategy 1] Compiling BBSmartBridge.jdp via rapc.exe..."/>
+        <exec executable="${jde.home}/bin/rapc.exe" failonerror="false">
+            <arg value="import=${jde.home}/lib/net_rim_api.jar"/>
+            <arg value="codename=BBSmartBridge"/>
+            <arg value="BBSmartBridge.jdp"/>
+        </exec>
+    </target>
+
+    <!-- Strategy 2: RAPC on BBSmartBridge.jdp via rapc.jar -->
+    <target name="build-jdp-jar" depends="check-env, check-cod, generate-alx" unless="cod.exists">
+        <echo message="[Strategy 2] Compiling BBSmartBridge.jdp via rapc.jar..."/>
+        <java jar="${jde.home}/bin/rapc.jar" fork="true" failonerror="false">
+            <arg value="import=${jde.home}/lib/net_rim_api.jar"/>
+            <arg value="codename=BBSmartBridge"/>
+            <arg value="BBSmartBridge.jdp"/>
+        </java>
+    </target>
+
+    <!-- Strategy 3: Compile classes to JAR then RAPC via rapc.exe -->
+    <target name="compile-classes" depends="check-env, check-cod" unless="cod.exists">
+        <echo message="[Strategy 3] Compiling Java classes with javac (target 1.4)..."/>
+        <mkdir dir="build/classes"/>
+        <javac srcdir="src" destdir="build/classes" source="1.4" target="1.4" bootclasspath="${jde.home}/lib/net_rim_api.jar" includeantruntime="false" debug="true"/>
+        <copy todir="build/classes">
+            <fileset dir="." includes="icon.png"/>
+        </copy>
+        <jar destfile="BBSmartBridge.jar" basedir="build/classes"/>
+    </target>
+
+    <target name="build-from-jar" depends="compile-classes, check-cod, generate-rapc, generate-alx" unless="cod.exists">
+        <echo message="[Strategy 3] Compiling BBSmartBridge.jar via rapc.exe..."/>
+        <exec executable="${jde.home}/bin/rapc.exe" failonerror="false">
+            <arg value="import=${jde.home}/lib/net_rim_api.jar"/>
+            <arg value="codename=BBSmartBridge"/>
+            <arg value="BBSmartBridge.rapc"/>
+            <arg value="BBSmartBridge.jar"/>
+        </exec>
+    </target>
+
+    <!-- Strategy 4: Compile classes to JAR then RAPC via rapc.jar -->
+    <target name="build-from-jar-fallback" depends="compile-classes, check-cod, generate-rapc, generate-alx" unless="cod.exists">
+        <echo message="[Strategy 4] Compiling BBSmartBridge.jar via rapc.jar..."/>
+        <java jar="${jde.home}/bin/rapc.jar" fork="true" failonerror="false">
+            <arg value="import=${jde.home}/lib/net_rim_api.jar"/>
+            <arg value="codename=BBSmartBridge"/>
+            <arg value="BBSmartBridge.rapc"/>
+            <arg value="BBSmartBridge.jar"/>
+        </java>
+    </target>
+
+    <target name="build" depends="check-env, generate-alx">
+        <echo message="Building BBSmartBridge using BlackBerry JDE at: ${jde.home}"/>
+        
+        <antcall target="build-jdp"/>
+        <antcall target="build-jdp-jar"/>
+        <antcall target="build-from-jar"/>
+        <antcall target="build-from-jar-fallback"/>
+
+        <fail message="BUILD FAILED: BBSmartBridge.cod was not created!">
+            <condition>
+                <not>
+                    <available file="BBSmartBridge.cod"/>
+                </not>
+            </condition>
+        </fail>
+        
+        <echo message="====================================================="/>
+        <echo message="BUILD SUCCESSFUL: BBSmartBridge.cod and BBSmartBridge.jad are ready!"/>
+        <echo message="====================================================="/>
+    </target>
+
+    <target name="clean">
+        <delete dir="build"/>
+        <delete>
+            <fileset dir="." includes="*.cod,*.jad,*.cso,*.debug,*.jar,*.rapc,*.alx"/>
+        </delete>
+    </target>
+</project>

@@ -1,0 +1,47 @@
+=== EXEMPLE 1 : CONNEXION INITIALE ET HEARTBEAT ===
+
+[Android -> BlackBerry]
+HELLO|BSB/1|ANDROID
+
+[BlackBerry -> Android]
+HELLO|BSB/1|BLACKBERRY_9790
+
+[BlackBerry -> Android]
+READY
+
+[Android -> BlackBerry]
+BATTERY|78
+
+[Android -> BlackBerry] (Heartbeat)
+PING
+
+[BlackBerry -> Android]
+PONG
+
+
+=== EXEMPLE 2 : RECEPTION ET REPONSE WHATSAPP ===
+
+[Android -> BlackBerry]
+NOTIFICATION|152|WhatsApp|Mohamed|Salut ça va ?
+
+(L'utilisateur lit et répond sur le BlackBerry)
+
+[BlackBerry -> Android]
+REPLY|152|Oui, je te rejoins à 18h.
+
+
+=== EXEMPLE 3 : GESTION D'APPEL ===
+
+[Android -> BlackBerry]
+CALL_INCOMING|888|Amina|0612345678
+
+(Le BlackBerry vibre et affiche la boite de dialogue)
+(L'utilisateur appuie sur la touche verte)
+
+[BlackBerry -> Android]
+CALL_ANSWER|888
+
+(L'appel se termine)
+
+[Android -> BlackBerry]
+CALL_END|888
