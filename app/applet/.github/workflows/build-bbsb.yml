@@ -27,10 +27,20 @@ jobs:
         $javaPath = $env:JAVA_HOME
         Write-Host "JAVA_HOME détecté : $javaPath"
         
+        # Ajout du binaire Java au PATH de la session et de GitHub Actions
         Add-Content -Path $env:GITHUB_PATH -Value "$javaPath\bin"
         
         $versions = @("1.6", "1.7", "1.8")
         $rootKeys = @("HKLM:\SOFTWARE\JavaSoft", "HKLM:\SOFTWARE\Wow6432Node\JavaSoft")
+        
+        $jvmDll = Get-ChildItem -Path $javaPath -Filter "jvm.dll" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($jvmDll) {
+            $jvmPath = $jvmDll.FullName
+            Write-Host "Fichier jvm.dll localisé : $jvmPath"
+        } else {
+            $jvmPath = "$javaPath\bin\client\jvm.dll"
+            Write-Host "Fichier jvm.dll par défaut : $jvmPath"
+        }
         
         foreach ($root in $rootKeys) {
             foreach ($type in @("Java Development Kit", "Java Runtime Environment")) {
@@ -42,28 +52,41 @@ jobs:
                     $verPath = "$typePath\$ver"
                     New-Item -Path $verPath -Force | Out-Null
                     New-ItemProperty -Path $verPath -Name "JavaHome" -Value $javaPath -Force | Out-Null
-                    New-ItemProperty -Path $verPath -Name "RuntimeLib" -Value "$javaPath\bin\client\jvm.dll" -Force -ErrorAction SilentlyContinue | Out-Null
+                    New-ItemProperty -Path $verPath -Name "RuntimeLib" -Value $jvmPath -Force -ErrorAction SilentlyContinue | Out-Null
                 }
             }
         }
         Write-Host "Clés de registre Java créées avec succès."
 
-    - name: 🛠️ Setup Apache Ant
+    - name: 🛠️ Setup Apache Ant 1.9.16 (Compatible Java 7)
       shell: powershell
       run: |
-        Write-Host "Installation d'Apache Ant..."
-        choco install ant -y --no-progress
-        $antBat = Get-ChildItem -Path "C:\ProgramData\chocolatey" -Filter "ant.bat" -Recurse | Select-Object -First 1
-        if ($antBat) {
-            Write-Host "Ant trouvé dans : $($antBat.Directory.FullName)"
-            Add-Content -Path $env:GITHUB_PATH -Value $antBat.Directory.FullName
-        }
-        Add-Content -Path $env:GITHUB_PATH -Value "C:\ProgramData\chocolatey\bin"
+        Write-Host "Téléchargement et configuration d'Apache Ant 1.9.16..."
+        $antUrl = "https://archive.apache.org/dist/ant/binaries/apache-ant-1.9.16-bin.zip"
+        $antZip = "C:\apache-ant-1.9.16-bin.zip"
+        $antDest = "C:\apache-ant"
+        
+        New-Item -ItemType Directory -Force -Path $antDest | Out-Null
+        Invoke-WebRequest -Uri $antUrl -OutFile $antZip -UseBasicParsing
+        Expand-Archive -Path $antZip -DestinationPath $antDest -Force
+        
+        $antHomeDir = Get-ChildItem -Path $antDest -Directory | Select-Object -First 1
+        $antBin = "$($antHomeDir.FullName)\bin"
+        Write-Host "Ant 1.9.16 installé avec succès dans : $($antHomeDir.FullName)"
+        Write-Host "Dossier bin Ant : $antBin"
+        
+        Add-Content -Path $env:GITHUB_ENV -Value "ANT_HOME=$($antHomeDir.FullName)"
+        Add-Content -Path $env:GITHUB_PATH -Value $antBin
+        $env:PATH = "$antBin;$env:PATH"
+        $env:ANT_HOME = $antHomeDir.FullName
+        
+        Write-Host "Vérification de Ant :"
+        & "$antBin\ant.bat" -version
 
     - name: 🚀 Téléchargement du JDE 5.0.0
       shell: powershell
       run: |
-        $url = "https://archive.org/download/blackberry-jde/BlackBerry_JDE_5.0.0.exe"
+        $url = "https://archive.apache.org/download/blackberry-jde/BlackBerry_JDE_5.0.0.exe"
         $exePath = "C:\BlackBerry_JDE_5.0.0.exe"
         Write-Host "Téléchargement du JDE 5.0.0 depuis archive.org..."
         Invoke-WebRequest -Uri $url -OutFile $exePath
@@ -118,9 +141,24 @@ jobs:
         Write-Host "Lancement de la compilation avec BLACKBERRY_JDE_HOME=$env:BLACKBERRY_JDE_HOME"
         Set-Location blackberry
         
+        Write-Host "--- Vérification des environnements ---"
+        java -version
+        ant -version
+        Write-Host "---------------------------------------"
+        
+        # Exécution de Ant avec affichage direct et enregistrement de la sortie
         & ant build 2>&1 | Tee-Object -FilePath "rapc_output.txt"
         
+        # Vérification si le .cod a été produit par Ant
         $codFiles = Get-ChildItem -Filter "*.cod"
+        if (-not $codFiles) {
+            Write-Warning "Le fichier .cod n'a pas été produit par Ant. Tentative directe avec rapc.exe..."
+            $rapcExe = Join-Path $env:BLACKBERRY_JDE_HOME "bin\rapc.exe"
+            $netRimApi = Join-Path $env:BLACKBERRY_JDE_HOME "lib\net_rim_api.jar"
+            & $rapcExe "import=$netRimApi" "codename=BBSmartBridge" "BBSmartBridge.jdp" 2>&1 | Tee-Object -FilePath "rapc_output.txt" -Append
+            $codFiles = Get-ChildItem -Filter "*.cod"
+        }
+        
         if (-not $codFiles) {
             Write-Error "ÉCHEC CRITIQUE : Aucun fichier .cod n'a été produit !"
             exit 1
@@ -129,7 +167,10 @@ jobs:
         Write-Host "Compilation réussie ! Fichiers générés :"
         Get-ChildItem -Include "*.cod", "*.jad", "*.alx", "*.jar" | Format-Table Name, Length
         
-        Select-String -Pattern "requires signing|Warning!:" -Path "rapc_output.txt" | Out-File "security-api-report.txt" -Encoding utf8
+        # Génération du rapport de sécurité
+        if (Test-Path "rapc_output.txt") {
+            Select-String -Pattern "requires signing|Warning!:" -Path "rapc_output.txt" | Out-File "security-api-report.txt" -Encoding utf8
+        }
         Write-Host "Rapport de sécurité généré."
 
     - name: 📦 Sauvegarde des fichiers d'installation BlackBerry
