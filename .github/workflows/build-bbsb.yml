@@ -167,11 +167,73 @@ jobs:
         Write-Host "Compilation réussie ! Fichiers générés :"
         Get-ChildItem -Include "*.cod", "*.jad", "*.alx", "*.jar" | Format-Table Name, Length
         
+        # Inspection et décompression si le .cod est une archive ZIP contenant des modules frères
+        if (Test-Path "BBSmartBridge.cod") {
+            $bytes = [System.IO.File]::ReadAllBytes((Resolve-Path "BBSmartBridge.cod"))
+            if ($bytes.Length -gt 4 -and $bytes[0] -eq 0x50 -and $bytes[1] -eq 0x4B) {
+                Write-Host "NOTE : BBSmartBridge.cod est une archive ZIP. Extraction des modules enfants..."
+                Copy-Item -Path "BBSmartBridge.cod" -Destination "BBSmartBridge_archive.zip"
+                Expand-Archive -Path "BBSmartBridge_archive.zip" -DestinationPath "." -Force
+                Remove-Item -Path "BBSmartBridge_archive.zip" -Force
+                Write-Host "Extraction terminée. Liste complète des fichiers .cod disponibles :"
+                Get-ChildItem -Filter "*.cod" | Format-Table Name, Length
+            }
+        }
+        
+        # Affichage du contenu du fichier .jad pour vérification
+        if (Test-Path "BBSmartBridge.jad") {
+            Write-Host "--- Contenu de BBSmartBridge.jad ---"
+            Get-Content "BBSmartBridge.jad" | Write-Host
+            Write-Host "------------------------------------"
+        }
+        
+        # Création du guide d'installation pour l'utilisateur
+        $readmeText = @"
+=============================================================================
+GUIDE D'INSTALLATION - BBSmartBridge v1.0.6 (BlackBerry OS 5.0 / OS 6.0)
+=============================================================================
+
+POURQUOI L'ERREUR 'Unsupported media type: application/octet-stream' APPARAÎT :
+Le navigateur web BlackBerry ne peut pas exécuter un fichier .cod directement
+en tapant son URL. Le système BlackBerry exige le descripteur .jad pour lancer
+l'installateur d'applications.
+
+=============================================================================
+MÉTHODE 1 (RECOMMANDÉE) : VIA L'EXPLORATEUR DE FICHIERS NATIF (MÉDIAS)
+=============================================================================
+1. Copiez TOUS les fichiers .cod et le fichier BBSmartBridge.jad dans le même dossier
+   sur votre carte SD (par exemple dans le dossier : SDCard/BBSB/).
+2. Sur votre BlackBerry Curve, ouvrez l'application 'Médias' (ou 'Fichiers').
+3. Appuyez sur la touche MENU BlackBerry (touche avec le logo à gauche du trackpad).
+4. Sélectionnez 'Explorer' (ou 'Parcourir les fichiers').
+5. Allez dans : Carte mémoire > BBSB
+6. Cliquez sur 'BBSmartBridge.jad'.
+7. L'invite d'installation BlackBerry s'ouvre : cliquez sur 'Télécharger' ou 'Installer'.
+
+=============================================================================
+MÉTHODE 2 : VIA LE NAVIGATEUR WEB BLACKBERRY (WAP)
+=============================================================================
+1. Copiez les fichiers .cod et BBSmartBridge.jad dans SDCard/BBSB/.
+2. Dans le navigateur web du BlackBerry, tapez l'adresse suivante :
+   file:///SDCard/BBSB/BBSmartBridge.jad
+   (Attention : tapez bien .jad et SURTOUT PAS .cod !)
+3. Le navigateur va immédiatement lancer l'installateur natif.
+
+=============================================================================
+MÉTHODE 3 : VIA PC (BLACKBERRY DESKTOP SOFTWARE OU BBSAK / JL_Cmder)
+=============================================================================
+- Branchez le BlackBerry en USB au PC.
+- Utilisez BlackBerry Desktop Software avec le fichier BBSmartBridge.alx,
+  ou BBSAK / vnbbUtils en chargeant directement le fichier BBSmartBridge.cod.
+=============================================================================
+"@
+        Set-Content -Path "INSTALLATION_GUIDE.txt" -Value $readmeText -Encoding utf8
+        
         # Génération du rapport de sécurité
         if (Test-Path "rapc_output.txt") {
             Select-String -Pattern "requires signing|Warning!:" -Path "rapc_output.txt" | Out-File "security-api-report.txt" -Encoding utf8
         }
-        Write-Host "Rapport de sécurité généré."
+        Write-Host "Rapport de sécurité et guide générés."
 
     - name: 📦 Sauvegarde des fichiers d'installation BlackBerry
       uses: actions/upload-artifact@v4
@@ -182,6 +244,7 @@ jobs:
           blackberry/*.jad
           blackberry/*.alx
           blackberry/*.jar
+          blackberry/INSTALLATION_GUIDE.txt
           blackberry/security-api-report.txt
           blackberry/rapc_output.txt
         if-no-files-found: error
