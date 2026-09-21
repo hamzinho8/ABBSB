@@ -187,53 +187,16 @@ jobs:
             Write-Host "------------------------------------"
         }
         
-        # Création du guide d'installation pour l'utilisateur
-        $readmeText = @"
-=============================================================================
-GUIDE D'INSTALLATION - BBSmartBridge v1.0.6 (BlackBerry OS 5.0 / OS 6.0)
-=============================================================================
-
-POURQUOI L'ERREUR 'Unsupported media type: application/octet-stream' APPARAÎT :
-Le navigateur web BlackBerry ne peut pas exécuter un fichier .cod directement
-en tapant son URL. Le système BlackBerry exige le descripteur .jad pour lancer
-l'installateur d'applications.
-
-=============================================================================
-MÉTHODE 1 (RECOMMANDÉE) : VIA L'EXPLORATEUR DE FICHIERS NATIF (MÉDIAS)
-=============================================================================
-1. Copiez TOUS les fichiers .cod et le fichier BBSmartBridge.jad dans le même dossier
-   sur votre carte SD (par exemple dans le dossier : SDCard/BBSB/).
-2. Sur votre BlackBerry Curve, ouvrez l'application 'Médias' (ou 'Fichiers').
-3. Appuyez sur la touche MENU BlackBerry (touche avec le logo à gauche du trackpad).
-4. Sélectionnez 'Explorer' (ou 'Parcourir les fichiers').
-5. Allez dans : Carte mémoire > BBSB
-6. Cliquez sur 'BBSmartBridge.jad'.
-7. L'invite d'installation BlackBerry s'ouvre : cliquez sur 'Télécharger' ou 'Installer'.
-
-=============================================================================
-MÉTHODE 2 : VIA LE NAVIGATEUR WEB BLACKBERRY (WAP)
-=============================================================================
-1. Copiez les fichiers .cod et BBSmartBridge.jad dans SDCard/BBSB/.
-2. Dans le navigateur web du BlackBerry, tapez l'adresse suivante :
-   file:///SDCard/BBSB/BBSmartBridge.jad
-   (Attention : tapez bien .jad et SURTOUT PAS .cod !)
-3. Le navigateur va immédiatement lancer l'installateur natif.
-
-=============================================================================
-MÉTHODE 3 : VIA PC (BLACKBERRY DESKTOP SOFTWARE OU BBSAK / JL_Cmder)
-=============================================================================
-- Branchez le BlackBerry en USB au PC.
-- Utilisez BlackBerry Desktop Software avec le fichier BBSmartBridge.alx,
-  ou BBSAK / vnbbUtils en chargeant directement le fichier BBSmartBridge.cod.
-=============================================================================
-"@
-        Set-Content -Path "INSTALLATION_GUIDE.txt" -Value $readmeText -Encoding utf8
+        # Vérification du guide d'installation et génération du rapport de sécurité
+        if (-not (Test-Path "INSTALLATION_GUIDE.txt")) {
+            Write-Host "Création d'un guide d'installation minimal de secours..."
+            Set-Content -Path "INSTALLATION_GUIDE.txt" -Value "Consultez le guide d'installation pour BlackBerry Curve 9300." -Encoding utf8
+        }
         
-        # Génération du rapport de sécurité
         if (Test-Path "rapc_output.txt") {
             Select-String -Pattern "requires signing|Warning!:" -Path "rapc_output.txt" | Out-File "security-api-report.txt" -Encoding utf8
         }
-        Write-Host "Rapport de sécurité et guide générés."
+        Write-Host "Rapport de sécurité et guide prêts."
 
     - name: 📦 Sauvegarde des fichiers d'installation BlackBerry
       uses: actions/upload-artifact@v4
