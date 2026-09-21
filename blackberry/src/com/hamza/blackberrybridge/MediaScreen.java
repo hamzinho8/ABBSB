@@ -13,51 +13,51 @@ public class MediaScreen extends MainScreen {
     private DarkLabelField statusLabel;
     
     public MediaScreen(MediaManager manager) {
-        super(MainScreen.NO_VERTICAL_SCROLL | MainScreen.NO_HORIZONTAL_SCROLL);
+        super(MainScreen.VERTICAL_SCROLL | MainScreen.VERTICAL_SCROLLBAR);
         this.mediaManager = manager;
         manager.setActiveScreen(this);
         
         getMainManager().setBackground(BackgroundFactory.createSolidBackground(Color.BLACK));
         
-        VerticalFieldManager vfm = new VerticalFieldManager(Field.FIELD_HCENTER | Field.USE_ALL_HEIGHT);
-        vfm.setPadding(20, 10, 20, 10);
+        VerticalFieldManager vfm = new VerticalFieldManager(Field.FIELD_HCENTER);
+        vfm.setPadding(8, 8, 8, 8);
         
         DarkLabelField header = new DarkLabelField("Lecteur Multimédia", Field.FIELD_HCENTER, 0x00A2E8);
-        try { header.setFont(Font.getDefault().derive(Font.BOLD, 22)); } catch(Exception e){}
+        try { header.setFont(Font.getDefault().derive(Font.BOLD, 16)); } catch(Exception e){}
         vfm.add(header);
         vfm.add(new SeparatorField());
         
         VerticalFieldManager spacerTop = new VerticalFieldManager();
-        spacerTop.setPadding(30, 0, 0, 0);
+        spacerTop.setPadding(8, 0, 0, 0);
         vfm.add(spacerTop);
         
         titleLabel = new DarkLabelField(mediaManager.getTitle(), Field.FIELD_HCENTER, Color.WHITE);
-        try { titleLabel.setFont(Font.getDefault().derive(Font.BOLD, 28)); } catch(Exception e){}
+        try { titleLabel.setFont(Font.getDefault().derive(Font.BOLD, 18)); } catch(Exception e){}
         
         artistLabel = new DarkLabelField(mediaManager.getArtist(), Field.FIELD_HCENTER, 0xAAAAAA);
-        try { artistLabel.setFont(Font.getDefault().derive(Font.PLAIN, 20)); } catch(Exception e){}
+        try { artistLabel.setFont(Font.getDefault().derive(Font.PLAIN, 14)); } catch(Exception e){}
         
         statusLabel = new DarkLabelField(getFormattedState(mediaManager.getState()), Field.FIELD_HCENTER, 0x00FF00);
-        try { statusLabel.setFont(Font.getDefault().derive(Font.PLAIN, 18)); } catch(Exception e){}
+        try { statusLabel.setFont(Font.getDefault().derive(Font.PLAIN, 13)); } catch(Exception e){}
         
         vfm.add(titleLabel);
         
         VerticalFieldManager midSpacer = new VerticalFieldManager();
-        midSpacer.setPadding(5, 0, 15, 0);
+        midSpacer.setPadding(4, 0, 4, 0);
         vfm.add(midSpacer);
         
         vfm.add(artistLabel);
         
         VerticalFieldManager stateSpacer = new VerticalFieldManager();
-        stateSpacer.setPadding(10, 0, 30, 0);
+        stateSpacer.setPadding(6, 0, 8, 0);
         vfm.add(stateSpacer);
         
         vfm.add(statusLabel);
         
         HorizontalFieldManager btns = new HorizontalFieldManager(Field.FIELD_HCENTER);
-        btns.setPadding(20, 0, 0, 0);
+        btns.setPadding(10, 0, 0, 0);
         
-        DarkButtonField btnPrev = new DarkButtonField(" |<< ", 80, 50);
+        DarkButtonField btnPrev = new DarkButtonField(" |<< ", 70, 34);
         btnPrev.setChangeListener(new FieldChangeListener() {
             public void fieldChanged(Field field, int context) { mediaManager.previous(); }
         });
@@ -65,7 +65,7 @@ public class MediaScreen extends MainScreen {
         HorizontalFieldManager spacer1 = new HorizontalFieldManager();
         spacer1.setPadding(0, 5, 0, 5);
         
-        DarkButtonField btnPlayPause = new DarkButtonField(" >/|| ", 120, 50);
+        DarkButtonField btnPlayPause = new DarkButtonField(" >/|| ", 96, 34);
         btnPlayPause.setChangeListener(new FieldChangeListener() {
             public void fieldChanged(Field field, int context) {
                 if ("PLAYING".equals(mediaManager.getState())) {
@@ -79,7 +79,7 @@ public class MediaScreen extends MainScreen {
         HorizontalFieldManager spacer2 = new HorizontalFieldManager();
         spacer2.setPadding(0, 5, 0, 5);
         
-        DarkButtonField btnNext = new DarkButtonField(" >>| ", 80, 50);
+        DarkButtonField btnNext = new DarkButtonField(" >>| ", 70, 34);
         btnNext.setChangeListener(new FieldChangeListener() {
             public void fieldChanged(Field field, int context) { mediaManager.next(); }
         });
@@ -91,10 +91,10 @@ public class MediaScreen extends MainScreen {
         btns.add(btnNext);
         vfm.add(btns);
         
-        DarkLabelField hintLabel = new DarkLabelField("(Raccourcis: Espace=Play/Pause, P=Prec, N=Suiv)", Field.FIELD_HCENTER, 0x555555);
-        try { hintLabel.setFont(Font.getDefault().derive(Font.PLAIN, 14)); } catch(Exception e){}
+        DarkLabelField hintLabel = new DarkLabelField("(Raccourcis: Espace=Play/Pause, P=Prec, N=Suiv)", Field.FIELD_HCENTER, 0x777777);
+        try { hintLabel.setFont(Font.getDefault().derive(Font.PLAIN, 11)); } catch(Exception e){}
         VerticalFieldManager hintSpacer = new VerticalFieldManager(Field.FIELD_HCENTER);
-        hintSpacer.setPadding(30, 0, 0, 0);
+        hintSpacer.setPadding(8, 0, 0, 0);
         hintSpacer.add(hintLabel);
         vfm.add(hintSpacer);
         

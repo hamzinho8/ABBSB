@@ -14,22 +14,22 @@ public class ContactListScreen extends MainScreen {
     private Vector currentDisplayedContacts;
     
     public ContactListScreen(ContactManager manager) {
-        super(MainScreen.NO_VERTICAL_SCROLL | MainScreen.NO_HORIZONTAL_SCROLL);
+        super(MainScreen.DEFAULT_MENU | MainScreen.DEFAULT_CLOSE);
         this.contactManager = manager;
         this.contactManager.setActiveScreen(this);
         this.currentDisplayedContacts = new Vector();
         
         getMainManager().setBackground(BackgroundFactory.createSolidBackground(Color.BLACK));
         
-        VerticalFieldManager vfm = new VerticalFieldManager(Field.FIELD_HCENTER | Field.USE_ALL_HEIGHT);
+        VerticalFieldManager vfm = new VerticalFieldManager(Field.FIELD_HCENTER);
         
         DarkLabelField title = new DarkLabelField("CARNET D'ADRESSES", Field.FIELD_HCENTER, 0x00A2E8);
-        try { title.setFont(Font.getDefault().derive(Font.BOLD, 22)); } catch(Exception e){}
+        try { title.setFont(Font.getDefault().derive(Font.BOLD, 16)); } catch(Exception e){}
         vfm.add(title);
         vfm.add(new SeparatorField());
         
         HorizontalFieldManager searchContainer = new HorizontalFieldManager(Field.FIELD_HCENTER);
-        searchContainer.setPadding(10, 5, 10, 5);
+        searchContainer.setPadding(4, 4, 4, 4);
         
         searchField = new BasicEditField("Rechercher : ", "", 50, BasicEditField.FILTER_DEFAULT);
         

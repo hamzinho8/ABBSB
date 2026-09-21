@@ -21,67 +21,61 @@ public class SmartBridgeScreen extends MainScreen {
     private Timer uiTimer;
     
     public SmartBridgeScreen(SmartBridgeApp application) {
-        super(MainScreen.NO_VERTICAL_SCROLL | MainScreen.NO_HORIZONTAL_SCROLL);
+        super(MainScreen.VERTICAL_SCROLL | MainScreen.VERTICAL_SCROLLBAR);
         this.app = application;
         
         getMainManager().setBackground(BackgroundFactory.createSolidBackground(Color.BLACK));
         
         VerticalFieldManager header = new VerticalFieldManager(Field.FIELD_HCENTER);
-        header.setPadding(10, 0, 5, 0); 
+        header.setPadding(4, 4, 4, 4); 
         
-        HorizontalFieldManager topBanner = new HorizontalFieldManager(Field.FIELD_HCENTER);
-        topBanner.setPadding(0, 0, 10, 0);
-        
-        batteryLabel = new DarkLabelField("\uD83D\uDCF1 --%", 0x00FF00); 
-        weatherLabel = new DarkLabelField("  \u2601 -- deg C", 0x00A2E8); 
-        
-        try {
-            Font bannerFont = Font.getDefault().derive(Font.BOLD, 18);
-            batteryLabel.setFont(bannerFont);
-            weatherLabel.setFont(bannerFont);
-        } catch (Throwable e) {}
-        
-        topBanner.add(batteryLabel);
-        topBanner.add(weatherLabel);
-        header.add(topBanner);
-        
-        boolean isNight = app.getSettingsManager().isNightMode();
-        int clockColor = isNight ? 0x555555 : Color.WHITE;
-        
-        clockLabel = new DarkLabelField("--:--", Field.FIELD_HCENTER, clockColor);
-        try {
-            clockLabel.setFont(Font.getDefault().derive(Font.BOLD, 70));
-        } catch (Throwable e) {}
-        
-        dateLabel = new DarkLabelField("---", Field.FIELD_HCENTER, 0xAAAAAA);
-        try { dateLabel.setFont(Font.getDefault().derive(Font.PLAIN, 20)); } catch(Exception e){}
-        
-        header.add(clockLabel);
-        header.add(dateLabel);
-        
+        // Compact Status Line: BT status, BB battery, Phone battery
         HorizontalFieldManager statusContainer = new HorizontalFieldManager(Field.FIELD_HCENTER);
-        statusContainer.setPadding(5, 0, 10, 0);
+        statusContainer.setPadding(2, 0, 2, 0);
         
-        btStatusLabel = new DarkLabelField("[BT: WAIT] ", 0xFF0000); 
-        bbBatteryLabel = new DarkLabelField("[BB: --%]", 0xAAAAAA);
+        btStatusLabel = new DarkLabelField("[BT: WAIT] ", 0xFF3333); 
+        bbBatteryLabel = new DarkLabelField("[BB: --%] ", 0xAAAAAA);
+        batteryLabel = new DarkLabelField("[Ph: --%]", 0x00FF00); 
         
         try {
-            Font smallFont = Font.getDefault().derive(Font.PLAIN, 14);
+            Font smallFont = Font.getDefault().derive(Font.PLAIN, 12);
             btStatusLabel.setFont(smallFont);
             bbBatteryLabel.setFont(smallFont);
+            batteryLabel.setFont(smallFont);
         } catch (Throwable e) {}
         
         statusContainer.add(btStatusLabel);
         statusContainer.add(bbBatteryLabel);
+        statusContainer.add(batteryLabel);
         header.add(statusContainer);
+        
+        boolean isNight = app.getSettingsManager().isNightMode();
+        int clockColor = isNight ? 0x666666 : Color.WHITE;
+        
+        // Compact Clock & Date
+        clockLabel = new DarkLabelField("--:--", Field.FIELD_HCENTER, clockColor);
+        try {
+            clockLabel.setFont(Font.getDefault().derive(Font.BOLD, 30));
+        } catch (Throwable e) {}
+        
+        dateLabel = new DarkLabelField("---", Field.FIELD_HCENTER, 0x888888);
+        try { dateLabel.setFont(Font.getDefault().derive(Font.PLAIN, 12)); } catch(Exception e){}
+        
+        weatherLabel = new DarkLabelField("  -- deg C", Field.FIELD_HCENTER, 0x00A2E8); 
+        try { weatherLabel.setFont(Font.getDefault().derive(Font.PLAIN, 12)); } catch (Throwable e) {}
+        
+        header.add(clockLabel);
+        header.add(dateLabel);
+        header.add(weatherLabel);
         
         add(header);
         
-        // --- 3x3 LAUNCHER GRID ---
+        // --- 3x3 LAUNCHER GRID (Optimized for 320x240 Curve screen) ---
         VerticalFieldManager grid = new VerticalFieldManager(Field.FIELD_HCENTER);
+        grid.setPadding(2, 0, 4, 0);
         
-        int btnW = 145;
-        int btnH = 40; // Smaller height to fit everything with weather label
+        int btnW = 96;  // 3 * 96 = 288px, fits comfortably in 320px screen
+        int btnH = 30;  // 3 rows = 90px height
         
         HorizontalFieldManager row1 = new HorizontalFieldManager(Field.FIELD_HCENTER);
         DarkButtonField btnCalls = new DarkButtonField("Calls", btnW, btnH);
@@ -105,6 +99,7 @@ public class SmartBridgeScreen extends MainScreen {
         grid.add(row1);
         
         HorizontalFieldManager row2 = new HorizontalFieldManager(Field.FIELD_HCENTER);
+        row2.setPadding(3, 0, 0, 0);
         DarkButtonField btnWA = new DarkButtonField("WhatsApp", btnW, btnH);
         btnWA.setChangeListener(new FieldChangeListener() {
             public void fieldChanged(Field field, int context) { app.getConnectionManager().sendData("OPEN_APP|WhatsApp\n"); }
@@ -126,6 +121,7 @@ public class SmartBridgeScreen extends MainScreen {
         grid.add(row2);
         
         HorizontalFieldManager row3 = new HorizontalFieldManager(Field.FIELD_HCENTER);
+        row3.setPadding(3, 0, 0, 0);
         DarkButtonField btnContacts = new DarkButtonField("Contacts", btnW, btnH);
         btnContacts.setChangeListener(new FieldChangeListener() {
             public void fieldChanged(Field field, int context) { app.getUIManager().openContacts(); }
@@ -193,11 +189,11 @@ public class SmartBridgeScreen extends MainScreen {
     }
     
     public void updateWeather(String temp, String unit, String cond, String city) {
-        weatherLabel.setText("  \u2601 " + temp + "°" + unit + " " + cond);
+        weatherLabel.setText(temp + "°" + unit + (cond != null && cond.length() > 0 ? " " + cond : ""));
     }
     
     public void updateBattery(String level) {
-        batteryLabel.setText("\uD83D\uDCF1 " + level + "%");
+        batteryLabel.setText("[Ph: " + level + "%]");
     }
     
     public void updateNotificationCount(int count) {

@@ -12,53 +12,52 @@ public class CallScreen extends MainScreen {
     private DarkLabelField statusLabel;
     
     public CallScreen(CallManager cm, String id, String name, String number) {
-        super(MainScreen.NO_VERTICAL_SCROLL | MainScreen.NO_HORIZONTAL_SCROLL);
+        super(MainScreen.VERTICAL_SCROLL | MainScreen.VERTICAL_SCROLLBAR);
         this.callManager = cm;
         this.callId = id;
         
         getMainManager().setBackground(BackgroundFactory.createSolidBackground(Color.BLACK));
         
-        VerticalFieldManager vfm = new VerticalFieldManager(Field.FIELD_HCENTER | Field.USE_ALL_HEIGHT);
-        vfm.setPadding(30, 0, 0, 0);
+        VerticalFieldManager vfm = new VerticalFieldManager(Field.FIELD_HCENTER);
+        vfm.setPadding(8, 6, 8, 6);
         
         DarkLabelField title = new DarkLabelField("Appel Entrant...", Field.FIELD_HCENTER, 0x00FF00); // Green title
-        try { title.setFont(Font.getDefault().derive(Font.BOLD, 22)); } catch(Exception e){}
+        try { title.setFont(Font.getDefault().derive(Font.BOLD, 16)); } catch(Exception e){}
         
         DarkLabelField nameLabel = new DarkLabelField(name != null && name.length() > 0 ? name : "Inconnu", Field.FIELD_HCENTER, Color.WHITE);
-        try { nameLabel.setFont(Font.getDefault().derive(Font.BOLD, 45)); } catch(Exception e){}
+        try { nameLabel.setFont(Font.getDefault().derive(Font.BOLD, 22)); } catch(Exception e){}
         
         DarkLabelField numberLabel = new DarkLabelField(number != null ? number : "", Field.FIELD_HCENTER, 0xAAAAAA);
-        try { numberLabel.setFont(Font.getDefault().derive(Font.PLAIN, 24)); } catch(Exception e){}
+        try { numberLabel.setFont(Font.getDefault().derive(Font.PLAIN, 14)); } catch(Exception e){}
         
         statusLabel = new DarkLabelField("Sonnerie...", Field.FIELD_HCENTER, 0xFFCC00);
-        try { statusLabel.setFont(Font.getDefault().derive(Font.PLAIN, 20)); } catch(Exception e){}
+        try { statusLabel.setFont(Font.getDefault().derive(Font.PLAIN, 13)); } catch(Exception e){}
         
         vfm.add(title);
         vfm.add(new SeparatorField());
         vfm.add(nameLabel);
         vfm.add(numberLabel);
-        vfm.add(new SeparatorField());
         vfm.add(statusLabel);
         
         // Spacer
         VerticalFieldManager spacer = new VerticalFieldManager();
-        spacer.setPadding(30, 0, 0, 0);
+        spacer.setPadding(10, 0, 0, 0);
         vfm.add(spacer);
         
         HorizontalFieldManager hfm = new HorizontalFieldManager(Field.FIELD_HCENTER);
         
-        CallButtonField btnAnswer = new CallButtonField("Décrocher", 0x009900, 0x00FF00, 150, 60);
+        CallButtonField btnAnswer = new CallButtonField("Décrocher", 0x009900, 0x00FF00, 130, 36);
         btnAnswer.setChangeListener(new FieldChangeListener() {
             public void fieldChanged(Field field, int context) { answer(); }
         });
         
-        CallButtonField btnReject = new CallButtonField("Refuser", 0xCC0000, 0xFF3333, 150, 60);
+        CallButtonField btnReject = new CallButtonField("Refuser", 0xCC0000, 0xFF3333, 130, 36);
         btnReject.setChangeListener(new FieldChangeListener() {
             public void fieldChanged(Field field, int context) { reject(); }
         });
         
         HorizontalFieldManager btnSpacing = new HorizontalFieldManager();
-        btnSpacing.setPadding(0, 10, 0, 10);
+        btnSpacing.setPadding(0, 6, 0, 6);
         
         hfm.add(btnAnswer);
         hfm.add(btnSpacing);
@@ -66,10 +65,10 @@ public class CallScreen extends MainScreen {
         
         vfm.add(hfm);
         
-        DarkLabelField hintLabel = new DarkLabelField("(Use Physical Green/Red Keys)", Field.FIELD_HCENTER, 0x555555);
-        try { hintLabel.setFont(Font.getDefault().derive(Font.PLAIN, 16)); } catch(Exception e){}
+        DarkLabelField hintLabel = new DarkLabelField("(Touches physiques Verte/Rouge)", Field.FIELD_HCENTER, 0x777777);
+        try { hintLabel.setFont(Font.getDefault().derive(Font.PLAIN, 11)); } catch(Exception e){}
         VerticalFieldManager hintSpacer = new VerticalFieldManager(Field.FIELD_HCENTER);
-        hintSpacer.setPadding(15, 0, 0, 0);
+        hintSpacer.setPadding(8, 0, 0, 0);
         hintSpacer.add(hintLabel);
         vfm.add(hintSpacer);
         

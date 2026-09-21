@@ -44,12 +44,12 @@ public class NotificationDetailScreen extends MainScreen {
         add(replyField);
         
         HorizontalFieldManager actionsRow = new HorizontalFieldManager(Field.FIELD_HCENTER);
-        DarkButtonField btnSend = new DarkButtonField("Send Text", 130, 40);
+        DarkButtonField btnSend = new DarkButtonField("Envoyer Texte", 120, 34);
         btnSend.setChangeListener(new FieldChangeListener() {
             public void fieldChanged(Field field, int context) { sendTextReply(); }
         });
         
-        btnRecordVoice = new DarkButtonField("🎤 Hold to Record", 160, 40);
+        btnRecordVoice = new DarkButtonField("[REC] Vocal", 130, 34);
         
         // Advanced Touch/Click handling for Voice Note (Push to talk style or Click to toggle)
         btnRecordVoice.setChangeListener(new FieldChangeListener() {
@@ -66,7 +66,7 @@ public class NotificationDetailScreen extends MainScreen {
         add(recordingLabel);
         
         add(new SeparatorField());
-        DarkLabelField qrTitle = new DarkLabelField("Quick Replies:", 0x0078D7);
+        DarkLabelField qrTitle = new DarkLabelField("Réponses Rapides:", 0x0078D7);
         add(qrTitle);
         
         Vector qr = app.getSettingsManager().getQuickReplies();
@@ -74,7 +74,7 @@ public class NotificationDetailScreen extends MainScreen {
         for (int i = 0; i < qr.size(); i++) {
             final String replyText = (String) qr.elementAt(i);
             if (replyText != null && replyText.trim().length() > 0) {
-                DarkButtonField btn = new DarkButtonField(replyText, 250, 40);
+                DarkButtonField btn = new DarkButtonField(replyText, 260, 32);
                 btn.setChangeListener(new FieldChangeListener() {
                     public void fieldChanged(Field field, int context) {
                         notifManager.replyToNotification(notification.id, replyText);

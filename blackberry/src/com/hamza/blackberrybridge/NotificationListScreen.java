@@ -17,7 +17,7 @@ public class NotificationListScreen extends MainScreen {
         
         getMainManager().setBackground(BackgroundFactory.createSolidBackground(Color.BLACK));
         DarkLabelField title = new DarkLabelField("NOTIFICATIONS", Field.FIELD_HCENTER, 0x0078D7);
-        try { title.setFont(Font.getDefault().derive(Font.BOLD, 24)); } catch(Exception e){}
+        try { title.setFont(Font.getDefault().derive(Font.BOLD, 16)); } catch(Exception e){}
         add(title);
         add(new SeparatorField());
         
@@ -31,14 +31,14 @@ public class NotificationListScreen extends MainScreen {
         listContainer.deleteAll();
         Vector notifs = notifManager.getNotifications();
         if (notifs.isEmpty()) {
-            listContainer.add(new DarkLabelField("No notifications.", Field.FIELD_HCENTER, 0xAAAAAA));
+            listContainer.add(new DarkLabelField("Aucune notification.", Field.FIELD_HCENTER, 0xAAAAAA));
             return;
         }
         
         for (int i = 0; i < notifs.size(); i++) {
             final Notification n = (Notification) notifs.elementAt(notifs.size() - 1 - i); // Latest first
             
-            DarkButtonField btn = new DarkButtonField(n.app + " - " + n.sender, 300, 50);
+            DarkButtonField btn = new DarkButtonField(n.app + ": " + n.sender, 290, 34);
             btn.setChangeListener(new FieldChangeListener() {
                 public void fieldChanged(Field field, int context) {
                     notifManager.openNotification(n);

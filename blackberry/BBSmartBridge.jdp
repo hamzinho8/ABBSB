@@ -1,12 +1,12 @@
 # BlackBerry JDE Project
-Title=BBSmartBridge
+Title=SmartBridge
 Version=1.0.6
 Vendor=Hamza
 Description=Android Bluetooth Companion for BlackBerry
 Type=0
 SystemModule=0
 RunOnStartup=0
-RibbonPosition=0
+RibbonPosition=
 Icon=icon.png
 [Files]
 icon.png

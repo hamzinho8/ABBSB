@@ -8,9 +8,11 @@ import net.rim.device.api.ui.TouchEvent;
 
 public class DarkButtonField extends Field {
     private String label;
-    private int bgColor = 0x222222; // Dark grey
-    private int focusColor = 0x0078D7; // Smartwatch Blue
-    private int fontColor = Color.WHITE;
+    private int bgColor = 0x22262E;      // Refined dark slate
+    private int borderColor = 0x383E4A;  // Subtle border
+    private int focusColor = 0x0078D7;   // Electric BlackBerry / Smartwatch Blue
+    private int focusBorder = 0x00A2E8;  // Cyan glow border on focus
+    private int fontColor = 0xE0E0E0;
     private int width, height;
 
     public DarkButtonField(String label, int width, int height) {
@@ -36,13 +38,22 @@ public class DarkButtonField extends Field {
 
     protected void paint(Graphics graphics) {
         boolean focused = isFocus();
-        graphics.setColor(focused ? focusColor : bgColor);
-        graphics.fillRoundRect(0, 0, getWidth(), getHeight(), 16, 16);
+        int w = getWidth();
+        int h = getHeight();
         
+        // Fill button background
+        graphics.setColor(focused ? focusColor : bgColor);
+        graphics.fillRoundRect(0, 0, w, h, 10, 10);
+        
+        // Draw crisp 1px border
+        graphics.setColor(focused ? focusBorder : borderColor);
+        graphics.drawRoundRect(0, 0, w, h, 10, 10);
+        
+        // Draw label centered
         graphics.setColor(focused ? Color.WHITE : fontColor);
         Font f = graphics.getFont();
-        int tx = (getWidth() - f.getAdvance(label)) / 2;
-        int ty = (getHeight() - f.getHeight()) / 2;
+        int tx = (w - f.getAdvance(label)) / 2;
+        int ty = (h - f.getHeight()) / 2;
         graphics.drawText(label, tx, ty);
     }
 

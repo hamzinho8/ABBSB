@@ -9,7 +9,7 @@
     </target>
 
     <target name="generate-rapc">
-        <echo file="BBSmartBridge.rapc">MIDlet-Name: BBSmartBridge
+        <echo file="BBSmartBridge.rapc">MIDlet-Name: SmartBridge
 MIDlet-Version: 1.0.6
 MIDlet-Vendor: Hamza
 MIDlet-Description: Android Bluetooth Companion for BlackBerry
@@ -17,7 +17,7 @@ MIDlet-Jar-URL: BBSmartBridge.jar
 MIDlet-Jar-Size: 0
 MicroEdition-Profile: MIDP-2.0
 MicroEdition-Configuration: CLDC-1.1
-MIDlet-1: BBSmartBridge,icon.png,com.hamza.blackberrybridge.SmartBridgeApp
+MIDlet-1: SmartBridge,icon.png,com.hamza.blackberrybridge.SmartBridgeApp
 RIM-MIDlet-Flags-1: 0</echo>
     </target>
     
