@@ -6,8 +6,9 @@ Description=Android Bluetooth Companion for BlackBerry
 Type=0
 SystemModule=0
 RunOnStartup=0
-RibbonPosition=
+RibbonPosition=0
 Icon=icon.png
+RolloverIcon=icon.png
 [Files]
 icon.png
 src\com\hamza\blackberrybridge\AudioManager.java

@@ -29,6 +29,38 @@ MÉTHODE 2 : VIA LE NAVIGATEUR WEB BLACKBERRY (WAP)
 3. Le navigateur va immédiatement lancer l'installateur natif.
 
 =============================================================================
+COMMENT TROUVER ET LANCER L'APPLICATION SUR BLACKBERRY CURVE 9300 :
+=============================================================================
+Si l'application est bien installée (visible dans Options > Applications) 
+mais n'apparaît pas sur l'écran d'accueil principal :
+
+1. REGARDEZ DANS LE DOSSIER "TÉLÉCHARGEMENTS" OU "APPLICATIONS" :
+   - Par défaut, BlackBerry OS classe automatiquement toute application 
+     téléchargée via le navigateur dans le dossier "Téléchargements" (Downloads)
+     ou le dossier "Applications", et NON sur la grille principale !
+   - Ouvrez le dossier "Téléchargements" pour trouver l'icône "SmartBridge".
+
+2. AFFICHEZ LES ICÔNES MASQUÉES :
+   - Sur l'écran d'accueil, appuyez sur la touche MENU BlackBerry 
+     (touche physique avec le logo BlackBerry, à gauche du pavé tactile/trackpad).
+   - Dans le menu contextuel, cliquez sur "Afficher tous" (Show All).
+   - Si l'icône était masquée ou grisée, elle apparaîtra. 
+     Faites ensuite Menu > "Démasquer" ou "Déplacer" vers l'écran d'accueil.
+
+3. VÉRIFIEZ LE VOLET ACTIF SUR BLACKBERRY OS 6 :
+   - Le BlackBerry Curve 9300 dispose de plusieurs volets d'accueil :
+     [ Tous ] [ Favoris ] [ Multimédia ] [ Téléchargements ] [ Fréquent ]
+   - Faites glisser le trackpad horizontalement vers la gauche ou la droite
+     pour vous positionner sur le volet "Tous" ou le volet "Téléchargements".
+
+4. REDÉMARRAGE DU BLACKBERRY (RAFRAÎCHISSEMENT DU CACHE DU LANCEUR) :
+   - Le lanceur BlackBerry met en cache la liste des icônes.
+   - Effectuez un redémarrage logiciel : appuyez simultanément sur
+     [ Alt ] + [ Majuscule Gauche (flèche vers le haut) ] + [ Suppr / Del ]
+     ou retirez la batterie pendant 10 secondes puis remettez-la.
+   - Au redémarrage, la Ribbon rechargera la table complète des icônes.
+
+=============================================================================
 MÉTHODE 3 : VIA PC (BLACKBERRY DESKTOP SOFTWARE OU BBSAK / JL_Cmder)
 =============================================================================
 - Branchez le BlackBerry en USB au PC.
