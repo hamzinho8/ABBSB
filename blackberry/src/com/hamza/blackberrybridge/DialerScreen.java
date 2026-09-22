@@ -4,7 +4,6 @@ import net.rim.device.api.ui.*;
 import net.rim.device.api.ui.component.*;
 import net.rim.device.api.ui.container.*;
 import net.rim.device.api.ui.decor.*;
-import net.rim.device.api.ui.text.TextFilter;
 import net.rim.device.api.system.Application;
 
 public class DialerScreen extends MainScreen {
@@ -37,8 +36,7 @@ public class DialerScreen extends MainScreen {
         fieldContainer.setBackground(BackgroundFactory.createSolidBackground(0x222222));
         fieldContainer.setPadding(6, 8, 6, 8);
         
-        phoneField = new BasicEditField("", "", 20, Field.FIELD_HCENTER);
-        try { phoneField.setFilter(TextFilter.get(TextFilter.PHONE)); } catch(Throwable t) {}
+        phoneField = new BasicEditField("", "", 20, Field.FIELD_HCENTER | BasicEditField.FILTER_PHONE);
         try { phoneField.setFont(Font.getDefault().derive(Font.BOLD, 22)); } catch(Exception e){}
         
         fieldContainer.add(phoneField);
@@ -153,14 +151,6 @@ public class DialerScreen extends MainScreen {
                 case ACTION_INVOKE: { fieldChangeNotify(0); return true; }
             }
             return super.invokeAction(action);
-        }
-        
-        protected boolean touchEvent(net.rim.device.api.ui.TouchEvent message) {
-            if(message.getEvent() == net.rim.device.api.ui.TouchEvent.CLICK) {
-                fieldChangeNotify(0);
-                return true;
-            }
-            return super.touchEvent(message);
         }
     }
 }

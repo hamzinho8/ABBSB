@@ -4,7 +4,6 @@ import net.rim.device.api.ui.Field;
 import net.rim.device.api.ui.Graphics;
 import net.rim.device.api.ui.Color;
 import net.rim.device.api.ui.Font;
-import net.rim.device.api.ui.TouchEvent;
 
 public class DarkButtonField extends Field {
     private String label;
@@ -67,13 +66,5 @@ public class DarkButtonField extends Field {
             case ACTION_INVOKE: { fieldChangeNotify(0); return true; }
         }
         return super.invokeAction(action);
-    }
-    
-    protected boolean touchEvent(TouchEvent message) {
-        if(message.getEvent() == TouchEvent.CLICK) {
-            fieldChangeNotify(0);
-            return true;
-        }
-        return super.touchEvent(message);
     }
 }

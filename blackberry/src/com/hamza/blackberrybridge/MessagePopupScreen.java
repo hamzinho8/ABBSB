@@ -3,13 +3,12 @@ package com.hamza.blackberrybridge;
 import net.rim.device.api.ui.*;
 import net.rim.device.api.ui.component.*;
 import net.rim.device.api.ui.container.*;
-import net.rim.device.api.system.Display;
 
 public class MessagePopupScreen extends PopupScreen {
     
     private SmartBridgeApp app;
     private String notificationId;
-    private AutoTextEditField replyField;
+    private BasicEditField replyField;
     
     public MessagePopupScreen(SmartBridgeApp app, String id, String sender, String body) {
         super(new VerticalFieldManager(Manager.VERTICAL_SCROLL | Manager.VERTICAL_SCROLLBAR));
@@ -22,7 +21,7 @@ public class MessagePopupScreen extends PopupScreen {
         add(title);
         add(new SeparatorField());
         
-        ActiveRichTextField bodyField = new ActiveRichTextField(body, Field.FIELD_HCENTER | Field.FOCUSABLE);
+        RichTextField bodyField = new RichTextField(body, Field.FIELD_HCENTER | Field.FOCUSABLE);
         try { bodyField.setFont(Font.getDefault().derive(Font.PLAIN, 16)); } catch(Exception e){}
         
         VerticalFieldManager bodyContainer = new VerticalFieldManager(Field.FIELD_HCENTER);
@@ -32,7 +31,7 @@ public class MessagePopupScreen extends PopupScreen {
         add(bodyContainer);
         add(new SeparatorField());
         
-        replyField = new AutoTextEditField("Votre réponse : ", "");
+        replyField = new BasicEditField("Votre réponse : ", "");
         VerticalFieldManager replyContainer = new VerticalFieldManager();
         replyContainer.setPadding(5, 10, 10, 10);
         replyContainer.add(replyField);
@@ -75,7 +74,7 @@ public class MessagePopupScreen extends PopupScreen {
             HardwareManager.stopMessageAlert();
             close();
             
-            net.rim.device.api.system.Application.getApplication().invokeLater(new Runnable() {
+            UiApplication.getUiApplication().invokeLater(new Runnable() {
                 public void run() {
                     Dialog.inform("Message envoyé !");
                 }
@@ -95,10 +94,8 @@ public class MessagePopupScreen extends PopupScreen {
     }
     
     protected void sublayout(int width, int height) {
-        int displayWidth = Display.getWidth();
-        int displayHeight = Display.getHeight();
-        int popupWidth = (int)(displayWidth * 0.90);
-        int popupHeight = Math.min(super.getPreferredHeight(), (int)(displayHeight * 0.90));
+        int popupWidth = (int)(width * 0.90);
+        int popupHeight = Math.min(super.getPreferredHeight(), (int)(height * 0.90));
         
         super.sublayout(popupWidth, popupHeight);
         setExtent(popupWidth, popupHeight);

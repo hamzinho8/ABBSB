@@ -4,7 +4,6 @@ import net.rim.device.api.ui.*;
 import net.rim.device.api.ui.component.*;
 import net.rim.device.api.ui.container.*;
 import net.rim.device.api.ui.decor.*;
-import net.rim.device.api.system.Characters;
 import java.util.Vector;
 
 public class ContactListScreen extends MainScreen {
@@ -64,7 +63,7 @@ public class ContactListScreen extends MainScreen {
                 }
             }
             protected boolean keyChar(char key, int status, int time) {
-                if (key == Characters.ENTER) {
+                if (key == '\n' || key == '\r' || key == 10 || key == 13) {
                     executeCall();
                     return true;
                 }
@@ -99,7 +98,7 @@ public class ContactListScreen extends MainScreen {
             
             contactManager.callContact(c.number);
             
-            net.rim.device.api.system.Application.getApplication().invokeLater(new Runnable() {
+            UiApplication.getUiApplication().invokeLater(new Runnable() {
                 public void run() {
                     Dialog.inform("Appel en cours vers " + c.name);
                 }

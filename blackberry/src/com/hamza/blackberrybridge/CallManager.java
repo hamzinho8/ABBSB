@@ -14,7 +14,7 @@ public class CallManager {
         HardwareManager.triggerCallAlert(app);
         
         activeCallScreen = new CallScreen(this, id, name, number);
-        uiManager.pushGlobalScreen(activeCallScreen);
+        uiManager.pushScreen(activeCallScreen);
     }
     
     public void handleCallActive(String id) {

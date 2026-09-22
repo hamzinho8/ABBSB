@@ -3,7 +3,6 @@ package com.hamza.blackberrybridge;
 import net.rim.device.api.ui.*;
 import net.rim.device.api.ui.component.*;
 import net.rim.device.api.ui.container.*;
-import net.rim.device.api.system.Display;
 
 public class FindPhonePopup extends PopupScreen {
     
@@ -34,10 +33,8 @@ public class FindPhonePopup extends PopupScreen {
     }
     
     protected void sublayout(int width, int height) {
-        int displayWidth = Display.getWidth();
-        int displayHeight = Display.getHeight();
-        int popupWidth = (int)(displayWidth * 0.85);
-        int popupHeight = Math.min(super.getPreferredHeight(), (int)(displayHeight * 0.50));
+        int popupWidth = (int)(width * 0.85);
+        int popupHeight = Math.min(super.getPreferredHeight(), (int)(height * 0.50));
         
         super.sublayout(popupWidth, popupHeight);
         setExtent(popupWidth, popupHeight);

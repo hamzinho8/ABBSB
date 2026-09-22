@@ -167,13 +167,5 @@ public class CallScreen extends MainScreen {
             }
             return super.invokeAction(action);
         }
-        
-        protected boolean touchEvent(net.rim.device.api.ui.TouchEvent message) {
-            if(message.getEvent() == net.rim.device.api.ui.TouchEvent.CLICK) {
-                fieldChangeNotify(0);
-                return true;
-            }
-            return super.touchEvent(message);
-        }
     }
 }

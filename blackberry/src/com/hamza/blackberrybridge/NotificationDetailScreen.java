@@ -9,7 +9,7 @@ import java.util.Vector;
 public class NotificationDetailScreen extends MainScreen {
     private NotificationManager notifManager;
     private Notification notification;
-    private AutoTextEditField replyField;
+    private BasicEditField replyField;
     private SmartBridgeApp app;
     private VoiceRecorder voiceRecorder;
     
@@ -39,8 +39,7 @@ public class NotificationDetailScreen extends MainScreen {
         
         add(new SeparatorField());
         
-        // Use AutoTextEditField for Full T9/QWERTY native BlackBerry experience
-        replyField = new AutoTextEditField("Reply: ", "");
+        replyField = new BasicEditField("Reply: ", "");
         add(replyField);
         
         HorizontalFieldManager actionsRow = new HorizontalFieldManager(Field.FIELD_HCENTER);

@@ -149,11 +149,11 @@ public class SmartBridgeScreen extends MainScreen {
         uiTimer = new Timer();
         uiTimer.schedule(new TimerTask() {
             public void run() {
-                Application.getApplication().invokeLater(new Runnable() {
+                UiApplication.getUiApplication().invokeLater(new Runnable() {
                     public void run() { updateTimeAndBBBattery(); }
                 });
             }
-        }, 0, 10000); 
+        }, 10000, 10000); 
     }
     
     private void updateTimeAndBBBattery() {
@@ -201,6 +201,14 @@ public class SmartBridgeScreen extends MainScreen {
     }
     
     public void addLog(String log) {
+    }
+    
+    public boolean onClose() {
+        if (uiTimer != null) {
+            uiTimer.cancel();
+            uiTimer = null;
+        }
+        return super.onClose();
     }
     
     protected boolean keyDown(int keycode, int time) {
