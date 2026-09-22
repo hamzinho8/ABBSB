@@ -50,41 +50,46 @@ public class BluetoothClient extends Thread implements DiscoveryListener {
                     connectionManager.onConnected();
                     LogManager.log("BT_CLIENT", "Streams opened successfully.");
 
-                    StringBuffer buffer = new StringBuffer();
-                    int ch;
-                    
-                    // Boucle de lecture permanente
-                    while (running && connected) {
-                        try {
-                            ch = inputStream.read();
-                            if (ch == -1) {
-                                break; // Connexion perdue
-                            }
-                            
-                            if (ch == '\n') {
-                                String msg = buffer.toString();
-                                connectionManager.onDataReceived(msg);
-                                buffer.setLength(0);
-                            } else if (ch != '\r') {
-                                buffer.append((char) ch);
-                            }
-                            
-                            if (buffer.length() > 4096) {
-                                LogManager.error("BT_CLIENT", "Buffer overflow");
-                                buffer.setLength(0);
-                            }
-                        } catch (IOException e) {
-                            break; // Erreur de lecture
-                        }
-                    }
+                    readStream();
                 }
             } catch (Throwable e) {
                 LogManager.error("BT_CLIENT_ERR", "Client Exception: " + e.getMessage());
-            } finally {
-                cleanupConnection();
-                if (running) {
-                    try { Thread.sleep(5000); } catch (Exception e) {} // Attendre avant reconnexion
+            }
+
+            cleanupConnection();
+
+            if (running) {
+                try {
+                    Thread.sleep(5000);
+                } catch (Exception e) {}
+            }
+        }
+    }
+
+    private void readStream() {
+        StringBuffer buffer = new StringBuffer();
+        int ch;
+        while (running && connected) {
+            try {
+                ch = inputStream.read();
+                if (ch == -1) {
+                    break; // Connexion perdue
                 }
+                
+                if (ch == '\n') {
+                    String msg = buffer.toString();
+                    connectionManager.onDataReceived(msg);
+                    buffer.setLength(0);
+                } else if (ch != '\r') {
+                    buffer.append((char) ch);
+                }
+                
+                if (buffer.length() > 4096) {
+                    LogManager.error("BT_CLIENT", "Buffer overflow");
+                    buffer.setLength(0);
+                }
+            } catch (IOException e) {
+                break; // Erreur de lecture
             }
         }
     }

@@ -168,14 +168,22 @@ jobs:
             $javaSources = Get-ChildItem -Path "src" -Filter "*.java" -Recurse | ForEach-Object { $_.FullName }
             & javac -source 1.4 -target 1.4 -bootclasspath "$netRimApi" -d "$classesDir" -encoding UTF-8 $javaSources
             
+            # Prevérification CLDC 1.1 pour BlackBerry
+            Write-Host "Exécution de preverify.exe pour compatibilité CLDC 1.1..."
+            $preverifyExe = Join-Path $env:BLACKBERRY_JDE_HOME "bin\preverify.exe"
+            $preverifiedDir = "build\preverified"
+            New-Item -ItemType Directory -Force -Path $preverifiedDir | Out-Null
+            & $preverifyExe -classpath "$netRimApi" -d "$preverifiedDir" "$classesDir"
+            $packDir = if (Test-Path "$preverifiedDir\com\hamza\blackberrybridge\SmartBridgeApp.class") { $preverifiedDir } else { $classesDir }
+
             # Copie de l'icône
-            Copy-Item "icon.png" "$classesDir\icon.png" -Force
-            New-Item -ItemType Directory -Force -Path "$classesDir\res" | Out-Null
-            Copy-Item "icon.png" "$classesDir\res\icon.png" -Force
+            Copy-Item "icon.png" "$packDir\icon.png" -Force
+            New-Item -ItemType Directory -Force -Path "$packDir\res" | Out-Null
+            Copy-Item "icon.png" "$packDir\res\icon.png" -Force
             
             # Création du JAR
-            Write-Host "Création de BBSmartBridge.jar..."
-            & jar cf "BBSmartBridge.jar" -C "$classesDir" .
+            Write-Host "Création de BBSmartBridge.jar depuis $packDir..."
+            & jar cf "BBSmartBridge.jar" -C "$packDir" .
             
             # Invocation RAPC avec le rapc et le jar
             Write-Host "Exécution de rapc.exe avec BBSmartBridge.rapc et BBSmartBridge.jar..."

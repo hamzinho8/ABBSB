@@ -59,10 +59,31 @@ RIM-MIDlet-Position-1: 0</echo>
         <copy file="icon.png" todir="build/classes/res" overwrite="true"/>
     </target>
 
-    <target name="package-jar" depends="compile-classes, generate-rapc, generate-alx">
-        <echo message="[Strategy 1] Packaging BBSmartBridge.jar with compiled classes and icon.png..."/>
+    <target name="preverify" depends="compile-classes">
+        <echo message="[Preverify] Running preverify.exe for CLDC 1.1 / BlackBerry..."/>
+        <delete dir="build/preverified" quiet="true"/>
+        <mkdir dir="build/preverified"/>
+        <exec executable="${jde.home}/bin/preverify.exe" failonerror="false">
+            <arg value="-classpath"/>
+            <arg value="${jde.home}/lib/net_rim_api.jar"/>
+            <arg value="-d"/>
+            <arg value="build/preverified"/>
+            <arg value="build/classes"/>
+        </exec>
+        <!-- Copy icon to root of preverified and res/ folder -->
+        <copy file="icon.png" todir="build/preverified" overwrite="true" failonerror="false"/>
+        <mkdir dir="build/preverified/res"/>
+        <copy file="icon.png" todir="build/preverified/res" overwrite="true" failonerror="false"/>
+    </target>
+
+    <target name="package-jar" depends="compile-classes, preverify, generate-rapc, generate-alx">
+        <echo message="[Strategy 1] Packaging BBSmartBridge.jar with classes and icon.png..."/>
+        <condition property="classes.dir" value="build/preverified" else="build/classes">
+            <available file="build/preverified/com/hamza/blackberrybridge/SmartBridgeApp.class"/>
+        </condition>
+        <echo message="Packaging from directory: ${classes.dir}"/>
         <delete file="BBSmartBridge.jar" quiet="true"/>
-        <jar destfile="BBSmartBridge.jar" basedir="build/classes">
+        <jar destfile="BBSmartBridge.jar" basedir="${classes.dir}">
             <manifest>
                 <attribute name="MIDlet-Name" value="SmartBridge"/>
                 <attribute name="MIDlet-Version" value="1.0.6"/>
