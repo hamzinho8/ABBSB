@@ -1,69 +1,100 @@
 =============================================================================
-GUIDE D'INSTALLATION - SmartBridge v1.0.6 (BlackBerry OS 5.0 / OS 6.0)
+GUIDE D'INSTALLATION & DE DÉPANNAGE - SmartBridge v1.0.6
+BlackBerry Curve 9300 / OS 5.0 - OS 6.0
 =============================================================================
 
-POURQUOI L'ERREUR 'Unsupported media type: application/octet-stream' APPARAÎT :
-Le navigateur web BlackBerry ne peut pas exécuter un fichier .cod directement
-en tapant son URL. Le système BlackBerry exige le descripteur .jad pour lancer
-l'installateur d'applications.
+1. EXPLICATION DE L'ANCIEN PROBLÈME ("unnamed 0.0 / anonymous / 2.7 KB") :
+-----------------------------------------------------------------------------
+Sur vos photos précédentes, l'application apparaissait sous le nom "unnamed", 
+version "0.0", taille "2768 octets" (2.7 Ko), sans nom et sans icône sur 
+l'écran d'accueil.
+POURQUOI ?
+Le compilateur RAPC avait emballé uniquement le fichier texte de configuration 
+brut au lieu de compiler les 33 classes Java du code source. Le fichier .cod 
+ne contenait donc aucune classe exécutable ni métadonnée d'application.
+CORRECTION APPORTÉE :
+Le système de compilation GitHub Actions et Ant a été corrigé en profondeur :
+- Compilation complète de l'ensemble des classes Java (bytecode CLDC 1.1 / MIDP 2.0).
+- Intégration de l'icône haute fidélité (48x48 pixels) à la racine du binaire.
+- Enregistrement des descripteurs MIDlet-1 (SmartBridge, icon.png, SmartBridgeApp).
+- Génération d'un binaire .cod complet (~40-60 Ko) portant le nom "SmartBridge" 
+  par "Hamza".
 
 =============================================================================
-MÉTHODE 1 (RECOMMANDÉE) : VIA L'EXPLORATEUR DE FICHIERS NATIF (MÉDIAS)
+2. ÉTAPE PRÉALABLE INDISPENSABLE : DÉSINSTALLER L'ANCIENNE VERSION FANTÔME
 =============================================================================
-1. Copiez TOUS les fichiers .cod et le fichier BBSmartBridge.jad dans le même dossier
-   sur votre carte SD (par exemple dans le dossier : SDCard/BBSB/).
-2. Sur votre BlackBerry Curve, ouvrez l'application 'Médias' (ou 'Fichiers').
-3. Appuyez sur la touche MENU BlackBerry (touche avec le logo à gauche du trackpad).
-4. Sélectionnez 'Explorer' (ou 'Parcourir les fichiers').
-5. Allez dans : Carte mémoire > BBSB
-6. Cliquez sur 'BBSmartBridge.jad'.
-7. L'invite d'installation BlackBerry s'ouvre : cliquez sur 'Télécharger' ou 'Installer'.
+Avant d'installer la nouvelle version, supprimez l'ancien paquet "unnamed" :
+1. Sur votre BlackBerry Curve 9300, allez dans :
+   Options (icône clé à molette) > Applications (ou Gestion des applications).
+2. Faites défiler vers l'onglet ou la liste "Tiers" (Third Party).
+3. Repérez l'entrée "unnamed 0.0" (ou "BBSmartBridge").
+4. Mettez-la en surbrillance, appuyez sur la touche MENU BlackBerry 
+   (touche physique à gauche du pavé tactile/trackpad).
+5. Sélectionnez "Supprimer" (Delete) et confirmez.
+6. Redémarrez le BlackBerry (retirez et remettez la batterie, ou pressez 
+   Alt + Majuscule Gauche + Suppr).
 
 =============================================================================
-MÉTHODE 2 : VIA LE NAVIGATEUR WEB BLACKBERRY (WAP)
+3. MÉTHODES D'INSTALLATION DE LA NOUVELLE VERSION
 =============================================================================
-1. Copiez les fichiers .cod et BBSmartBridge.jad dans SDCard/BBSB/.
-2. Dans le navigateur web du BlackBerry, tapez l'adresse suivante :
-   file:///SDCard/BBSB/BBSmartBridge.jad
-   (Attention : tapez bien .jad et SURTOUT PAS .cod !)
-3. Le navigateur va immédiatement lancer l'installateur natif.
+
+--- MÉTHODE 1 (RECOMMANDÉE SANS PC) : VIA CARTE MÉMOIRE (SD CARD) ---
+1. Téléchargez l'artefact ZIP généré par GitHub Actions : 
+   "BBSB_BlackBerry_Curve_9300_v1.0.6.zip" et décompressez-le sur votre ordinateur.
+2. Copiez TOUS les fichiers suivants dans un même dossier sur votre carte micro SD 
+   (par exemple dans le dossier : SDCard/BBSB/) :
+   - BBSmartBridge.jad
+   - BBSmartBridge.cod (et tout fichier BBSmartBridge-*.cod s'il y en a)
+3. Insérez la carte micro SD dans votre BlackBerry Curve 9300.
+4. Sur le téléphone, ouvrez l'application "Médias" (ou "Fichiers").
+5. Appuyez sur la touche MENU BlackBerry > "Explorer" (ou "Parcourir les fichiers").
+6. Naviguez dans : Carte mémoire > BBSB.
+7. Cliquez sur "BBSmartBridge.jad".
+8. L'écran officiel d'installation BlackBerry s'ouvre :
+   - Nom : SmartBridge
+   - Version : 1.0.6
+   - Fournisseur : Hamza
+   - Icône : Logo SmartBridge
+9. Cliquez sur "Télécharger" ou "Installer". L'installation prend quelques secondes.
+
+--- MÉTHODE 2 (ULTRA SIMPLE VIA PC) : AVEC BBSAK OU VNBBUTILS / JL_CMDER ---
+1. Connectez votre BlackBerry Curve 9300 au PC en USB.
+2. Lancez BBSAK (BlackBerry Swiss Army Knife) ou vnbbUtils.
+3. Entrez votre mot de passe si le terminal en a un, puis cliquez sur "Connect".
+4. Allez dans l'onglet "Install CODs" (ou "Load COD").
+5. Sélectionnez le fichier "BBSmartBridge.cod".
+6. L'outil injecte directement l'application dans la mémoire flash de l'appareil.
+7. Le BlackBerry redémarre automatiquement ou actualise sa liste d'icônes.
+
+--- MÉTHODE 3 : VIA BLACKBERRY DESKTOP SOFTWARE ---
+1. Connectez le BlackBerry au PC.
+2. Ouvrez BlackBerry Desktop Software (Desktop Manager).
+3. Cliquez sur "Applications" > "Importer" ou "Ajouter".
+4. Sélectionnez le fichier "BBSmartBridge.alx".
+5. Cliquez sur "Appliquer" pour synchroniser et installer sur le mobile.
 
 =============================================================================
-COMMENT TROUVER ET LANCER L'APPLICATION SUR BLACKBERRY CURVE 9300 :
+4. COMMENT TROUVER ET LANCER L'APPLICATION SUR BLACKBERRY CURVE 9300
 =============================================================================
-Si l'application est bien installée (visible dans Options > Applications) 
-mais n'apparaît pas sur l'écran d'accueil principal :
+Sur BlackBerry OS 6 (le système du Curve 9300) :
 
-1. REGARDEZ DANS LE DOSSIER "TÉLÉCHARGEMENTS" OU "APPLICATIONS" :
-   - Par défaut, BlackBerry OS classe automatiquement toute application 
-     téléchargée via le navigateur dans le dossier "Téléchargements" (Downloads)
-     ou le dossier "Applications", et NON sur la grille principale !
+1. DOSSIER "TÉLÉCHARGEMENTS" (DOWNLOADS) :
+   Par défaut, BlackBerry range toute nouvelle application tierce dans 
+   le dossier "Téléchargements" et non sur l'écran d'accueil principal.
    - Ouvrez le dossier "Téléchargements" pour trouver l'icône "SmartBridge".
 
-2. AFFICHEZ LES ICÔNES MASQUÉES :
-   - Sur l'écran d'accueil, appuyez sur la touche MENU BlackBerry 
-     (touche physique avec le logo BlackBerry, à gauche du pavé tactile/trackpad).
-   - Dans le menu contextuel, cliquez sur "Afficher tous" (Show All).
-   - Si l'icône était masquée ou grisée, elle apparaîtra. 
-     Faites ensuite Menu > "Démasquer" ou "Déplacer" vers l'écran d'accueil.
-
-3. VÉRIFIEZ LE VOLET ACTIF SUR BLACKBERRY OS 6 :
-   - Le BlackBerry Curve 9300 dispose de plusieurs volets d'accueil :
+2. VOLETS D'ACCUEIL :
+   - L'écran d'accueil d'OS 6 comporte 5 volets :
      [ Tous ] [ Favoris ] [ Multimédia ] [ Téléchargements ] [ Fréquent ]
-   - Faites glisser le trackpad horizontalement vers la gauche ou la droite
-     pour vous positionner sur le volet "Tous" ou le volet "Téléchargements".
+   - Faites glisser le trackpad horizontalement pour vérifier le volet "Tous" 
+     et le volet "Téléchargements".
 
-4. REDÉMARRAGE DU BLACKBERRY (RAFRAÎCHISSEMENT DU CACHE DU LANCEUR) :
-   - Le lanceur BlackBerry met en cache la liste des icônes.
-   - Effectuez un redémarrage logiciel : appuyez simultanément sur
-     [ Alt ] + [ Majuscule Gauche (flèche vers le haut) ] + [ Suppr / Del ]
-     ou retirez la batterie pendant 10 secondes puis remettez-la.
-   - Au redémarrage, la Ribbon rechargera la table complète des icônes.
+3. AFFICHER LES ICÔNES MASQUÉES :
+   - Sur l'écran d'accueil, appuyez sur la touche physique MENU BlackBerry.
+   - Cliquez sur "Afficher tous" (Show All).
+   - Si l'icône était masquée, elle devient visible. 
+     Faites Menu > "Déplacer" pour la positionner où vous voulez.
 
 =============================================================================
-MÉTHODE 3 : VIA PC (BLACKBERRY DESKTOP SOFTWARE OU BBSAK / JL_Cmder)
-=============================================================================
-- Branchez le BlackBerry en USB au PC.
-- Utilisez BlackBerry Desktop Software avec le fichier BBSmartBridge.alx,
-  ou BBSAK / vnbbUtils en chargeant directement le fichier BBSmartBridge.cod.
+Profitez de votre compagnon Bluetooth SmartBridge sur votre BlackBerry Curve 9300 !
 =============================================================================

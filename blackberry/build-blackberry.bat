@@ -18,14 +18,13 @@ if not exist "%BLACKBERRY_JDE_HOME%\bin\rapc.exe" (
 echo [INFO] Cleaning old builds...
 del *.cod *.jad *.cso *.debug *.jar 2>nul
 
-echo [INFO] Compiling with RAPC...
-"%BLACKBERRY_JDE_HOME%\bin\rapc.exe" import="%BLACKBERRY_JDE_HOME%\lib\net_rim_api.jar" codename=BBSmartBridge BBSmartBridge.jdp
-
+echo [INFO] Compiling BBSmartBridge with Ant...
+call ant build
 if %ERRORLEVEL% EQU 0 (
     echo [SUCCESS] Build Successful!
-    echo Generated BBSmartBridge.cod and BBSmartBridge.jad
+    echo Generated valid BBSmartBridge.cod, BBSmartBridge.jad, and BBSmartBridge.alx
     exit /b 0
 ) else (
-    echo [ERROR] Compilation failed!
+    echo [ERROR] Ant build failed!
     exit /b %ERRORLEVEL%
 )

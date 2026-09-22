@@ -146,41 +146,72 @@ jobs:
         ant -version
         Write-Host "---------------------------------------"
         
+        # Nettoyage préventif
+        if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
+        Get-ChildItem -Include "*.cod", "*.jar", "*.cso", "*.debug" | Remove-Item -Force -ErrorAction SilentlyContinue
+        
         # Exécution de Ant avec affichage direct et enregistrement de la sortie
+        Write-Host "Exécution de 'ant build'..."
         & ant build 2>&1 | Tee-Object -FilePath "rapc_output.txt"
         
-        # Vérification si le .cod a été produit par Ant
-        $codFiles = Get-ChildItem -Filter "*.cod"
-        if (-not $codFiles) {
-            Write-Warning "Le fichier .cod n'a pas été produit par Ant. Tentative directe avec rapc.exe..."
+        # Vérification du fichier BBSmartBridge.cod
+        $codFile = Get-Item "BBSmartBridge.cod" -ErrorAction SilentlyContinue
+        if (-not $codFile -or $codFile.Length -lt 10000) {
+            Write-Warning "Le fichier .cod n'a pas été produit correctement par Ant ($($codFile.Length) octets). Tentative directe complète..."
             $rapcExe = Join-Path $env:BLACKBERRY_JDE_HOME "bin\rapc.exe"
             $netRimApi = Join-Path $env:BLACKBERRY_JDE_HOME "lib\net_rim_api.jar"
-            & $rapcExe "import=$netRimApi" "codename=BBSmartBridge" "BBSmartBridge.jdp" 2>&1 | Tee-Object -FilePath "rapc_output.txt" -Append
-            $codFiles = Get-ChildItem -Filter "*.cod"
+            $classesDir = "build\classes"
+            New-Item -ItemType Directory -Force -Path $classesDir | Out-Null
+            
+            # Compilation Java
+            Write-Host "Compilation manuelle des classes Java..."
+            $javaSources = Get-ChildItem -Path "src" -Filter "*.java" -Recurse | ForEach-Object { $_.FullName }
+            & javac -source 1.4 -target 1.4 -bootclasspath "$netRimApi" -d "$classesDir" -encoding UTF-8 $javaSources
+            
+            # Copie de l'icône
+            Copy-Item "icon.png" "$classesDir\icon.png" -Force
+            New-Item -ItemType Directory -Force -Path "$classesDir\res" | Out-Null
+            Copy-Item "icon.png" "$classesDir\res\icon.png" -Force
+            
+            # Création du JAR
+            Write-Host "Création de BBSmartBridge.jar..."
+            & jar cf "BBSmartBridge.jar" -C "$classesDir" .
+            
+            # Invocation RAPC avec le rapc et le jar
+            Write-Host "Exécution de rapc.exe avec BBSmartBridge.rapc et BBSmartBridge.jar..."
+            & $rapcExe "import=$netRimApi" "codename=BBSmartBridge" "BBSmartBridge.rapc" "BBSmartBridge.jar" 2>&1 | Tee-Object -FilePath "rapc_output.txt" -Append
+            
+            $codFile = Get-Item "BBSmartBridge.cod" -ErrorAction SilentlyContinue
         }
         
-        if (-not $codFiles) {
-            Write-Error "ÉCHEC CRITIQUE : Aucun fichier .cod n'a été produit !"
+        if (-not $codFile) {
+            Write-Error "ÉCHEC CRITIQUE : Aucun fichier BBSmartBridge.cod n'a été produit !"
             exit 1
         }
         
-        Write-Host "Compilation réussie ! Fichiers générés :"
-        Get-ChildItem -Include "*.cod", "*.jad", "*.alx", "*.jar" | Format-Table Name, Length
-        
-        # Inspection et décompression si le .cod est une archive ZIP contenant des modules frères
-        if (Test-Path "BBSmartBridge.cod") {
-            $bytes = [System.IO.File]::ReadAllBytes((Resolve-Path "BBSmartBridge.cod"))
-            if ($bytes.Length -gt 4 -and $bytes[0] -eq 0x50 -and $bytes[1] -eq 0x4B) {
-                Write-Host "NOTE : BBSmartBridge.cod est une archive ZIP. Extraction des modules enfants..."
-                Copy-Item -Path "BBSmartBridge.cod" -Destination "BBSmartBridge_archive.zip"
-                Expand-Archive -Path "BBSmartBridge_archive.zip" -DestinationPath "." -Force
-                Remove-Item -Path "BBSmartBridge_archive.zip" -Force
-                Write-Host "Extraction terminée. Liste complète des fichiers .cod disponibles :"
-                Get-ChildItem -Filter "*.cod" | Format-Table Name, Length
-            }
+        if ($codFile.Length -lt 10000) {
+            Write-Error "ÉCHEC CRITIQUE : BBSmartBridge.cod est anormalement petit ($($codFile.Length) octets). Les classes Java n'ont pas été compilées dans le COD !"
+            exit 1
         }
         
-        # Affichage du contenu du fichier .jad pour vérification
+        Write-Host "====================================================="
+        Write-Host "COMPILATION RÉUSSIE AVEC SUCCÈS !"
+        Write-Host "Taille du COD : $($codFile.Length) octets"
+        Write-Host "====================================================="
+        Get-ChildItem -Include "*.cod", "*.jad", "*.alx", "*.jar" | Format-Table Name, Length
+        
+        # Inspection si le .cod est une archive ZIP contenant des modules frères (>64KB)
+        $bytes = [System.IO.File]::ReadAllBytes($codFile.FullName)
+        if ($bytes.Length -gt 4 -and $bytes[0] -eq 0x50 -and $bytes[1] -eq 0x4B) {
+            Write-Host "NOTE : BBSmartBridge.cod est une archive ZIP (>64Ko). Extraction des modules enfants..."
+            Copy-Item -Path "BBSmartBridge.cod" -Destination "BBSmartBridge_archive.zip"
+            Expand-Archive -Path "BBSmartBridge_archive.zip" -DestinationPath "." -Force
+            Remove-Item -Path "BBSmartBridge_archive.zip" -Force
+            Write-Host "Extraction terminée. Liste complète des fichiers .cod disponibles :"
+            Get-ChildItem -Filter "*.cod" | Format-Table Name, Length
+        }
+        
+        # Vérification et affichage du fichier .jad
         if (Test-Path "BBSmartBridge.jad") {
             Write-Host "--- Contenu de BBSmartBridge.jad ---"
             Get-Content "BBSmartBridge.jad" | Write-Host
