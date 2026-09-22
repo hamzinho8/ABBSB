@@ -2,6 +2,8 @@ package com.hamza.blackberrybridge;
 
 import net.rim.device.api.notification.NotificationsManager;
 import net.rim.device.api.notification.NotificationsConstants;
+import net.rim.device.api.system.Alert;
+import net.rim.device.api.system.LED;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -9,6 +11,7 @@ public class HardwareManager {
     private static Timer vibrateTimer;
     private static Timer findPhoneTimer;
     private static final long NOTIF_ID = 0x5a3b92c4L; // Unique ID for SmartBridge
+    private static final short[] BEEP_TUNE = new short[] { 1760, 200, 0, 50, 1760, 200 };
 
     static {
         try {
@@ -19,29 +22,56 @@ public class HardwareManager {
 
     public static void triggerMessageAlert() {
         try {
-            NotificationsManager.triggerNotification(NOTIF_ID, -1, 500, null);
+            if (Alert.isVibrateSupported()) {
+                Alert.startVibrate(500);
+            }
+        } catch (Throwable t) {}
+        try {
+            LED.setState(LED.STATE_BLINKING);
+        } catch (Throwable t) {}
+        try {
+            NotificationsManager.triggerImmediateEvent(NOTIF_ID, 0, null, null);
         } catch (Throwable t) {}
     }
     
     public static void stopMessageAlert() {
         try {
-            NotificationsManager.cancelNotification(NOTIF_ID);
+            LED.setState(LED.STATE_OFF);
+        } catch (Throwable t) {}
+        try {
+            NotificationsManager.cancelImmediateEvent(NOTIF_ID, 0, null, null);
         } catch (Throwable t) {}
     }
     
     public static void triggerNotificationAlert(SmartBridgeApp app, String appName) {
         try {
-            NotificationsManager.triggerNotification(NOTIF_ID, -1, 500, null);
+            if (Alert.isVibrateSupported()) {
+                Alert.startVibrate(500);
+            }
+        } catch (Throwable t) {}
+        try {
+            LED.setState(LED.STATE_BLINKING);
+        } catch (Throwable t) {}
+        try {
+            NotificationsManager.triggerImmediateEvent(NOTIF_ID, 0, null, null);
         } catch (Throwable t) {}
     }
     
     public static void triggerCallAlert(SmartBridgeApp app) {
         stopAlerts();
+        try {
+            LED.setState(LED.STATE_BLINKING);
+        } catch (Throwable t) {}
+        try {
+            NotificationsManager.triggerImmediateEvent(NOTIF_ID, 0, null, null);
+        } catch (Throwable t) {}
         vibrateTimer = new Timer();
         vibrateTimer.scheduleAtFixedRate(new TimerTask() {
             public void run() {
                 try {
-                    NotificationsManager.triggerNotification(NOTIF_ID, -1, 255, null);
+                    if (Alert.isVibrateSupported()) {
+                        Alert.startVibrate(600);
+                    }
                 } catch (Throwable t) {}
             }
         }, 0, 1000);
@@ -53,17 +83,31 @@ public class HardwareManager {
             vibrateTimer = null;
         }
         try {
-            NotificationsManager.cancelNotification(NOTIF_ID);
+            LED.setState(LED.STATE_OFF);
+        } catch (Throwable t) {}
+        try {
+            NotificationsManager.cancelImmediateEvent(NOTIF_ID, 0, null, null);
         } catch (Throwable t) {}
     }
     
     public static void startFindPhoneAlert() {
         stopFindPhoneAlert();
+        try {
+            LED.setState(LED.STATE_BLINKING);
+        } catch (Throwable t) {}
+        try {
+            NotificationsManager.triggerImmediateEvent(NOTIF_ID, 0, null, null);
+        } catch (Throwable t) {}
         findPhoneTimer = new Timer();
         findPhoneTimer.scheduleAtFixedRate(new TimerTask() {
             public void run() {
                 try {
-                    NotificationsManager.triggerNotification(NOTIF_ID, -1, 255, null);
+                    Alert.startAudio(BEEP_TUNE, 100);
+                } catch (Throwable t) {}
+                try {
+                    if (Alert.isVibrateSupported()) {
+                        Alert.startVibrate(500);
+                    }
                 } catch (Throwable t) {}
             }
         }, 0, 1000);
@@ -75,7 +119,10 @@ public class HardwareManager {
             findPhoneTimer = null;
         }
         try {
-            NotificationsManager.cancelNotification(NOTIF_ID);
+            LED.setState(LED.STATE_OFF);
+        } catch (Throwable t) {}
+        try {
+            NotificationsManager.cancelImmediateEvent(NOTIF_ID, 0, null, null);
         } catch (Throwable t) {}
     }
 }
