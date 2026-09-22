@@ -1,100 +1,92 @@
 =============================================================================
-GUIDE D'INSTALLATION & DE DÉPANNAGE - SmartBridge v1.0.6
+GUIDE D'INSTALLATION & DE DÉPANNAGE - SmartBridge v1.0.7
 BlackBerry Curve 9300 / OS 5.0 - OS 6.0
 =============================================================================
 
-1. EXPLICATION DE L'ANCIEN PROBLÈME ("unnamed 0.0 / anonymous / 2.7 KB") :
+1. EXPLICATION DE L'ERREUR RÉSOLUE ("attempts to access a secure API") :
 -----------------------------------------------------------------------------
-Sur vos photos précédentes, l'application apparaissait sous le nom "unnamed", 
-version "0.0", taille "2768 octets" (2.7 Ko), sans nom et sans icône sur 
-l'écran d'accueil.
-POURQUOI ?
-Le compilateur RAPC avait emballé uniquement le fichier texte de configuration 
-brut au lieu de compiler les 33 classes Java du code source. Le fichier .cod 
-ne contenait donc aucune classe exécutable ni métadonnée d'application.
-CORRECTION APPORTÉE :
-Le système de compilation GitHub Actions et Ant a été corrigé en profondeur :
-- Compilation complète de l'ensemble des classes Java (bytecode CLDC 1.1 / MIDP 2.0).
-- Intégration de l'icône haute fidélité (48x48 pixels) à la racine du binaire.
-- Enregistrement des descripteurs MIDlet-1 (SmartBridge, icon.png, SmartBridgeApp).
-- Génération d'un binaire .cod complet (~40-60 Ko) portant le nom "SmartBridge" 
-  par "Hamza".
+Sur votre BlackBerry Curve 9300, l'application s'installait bien avec son nom 
+et son icône, mais affichait au lancement :
+"Module 'BBSmartBridge' attempts to access a secure API" (ou "tente d'accéder à 
+une API sécurisée").
+
+POURQUOI CETTE ERREUR ?
+Le système BlackBerry OS (RIM) protège certaines fonctions matérielles 
+(net.rim.device.api.notification.NotificationsManager, Alert, LED). 
+Pour exécuter ces bibliothèques sur un vrai terminal physique, RIM exigeait 
+une signature cryptographique via des serveurs officiels BlackBerry (fichiers RBB, RCR, RRT).
+Comme les serveurs de signature BlackBerry sont définitivement fermés, toute 
+application qui appelle ces classes est systématiquement bloquée par l'OS physique.
+
+SOLUTION APPORTÉE DANS LA VERSION 1.0.7 :
+1. Suppression intégrale des dépendances aux API fermées et restreintes (LED, NotificationsManager, Alert).
+2. Remplacement par les API audio standard et ouvertes Java ME MMAPI (javax.microedition.media.Manager et playTone).
+3. Déclaration explicite des autorisations Bluetooth (MIDlet-Permissions: Connector.bluetooth.client/server).
+4. L'application SmartBridge v1.0.7 est désormais 100% autonome, libre de toute signature RIM et peut s'ouvrir instantanément sur votre Curve 9300 !
 
 =============================================================================
-2. ÉTAPE PRÉALABLE INDISPENSABLE : DÉSINSTALLER L'ANCIENNE VERSION FANTÔME
+2. ÉTAPE PRÉALABLE INDISPENSABLE : DÉSINSTALLER LA VERSION 1.0.6
 =============================================================================
-Avant d'installer la nouvelle version, supprimez l'ancien paquet "unnamed" :
+Avant d'installer la nouvelle version v1.0.7 :
 1. Sur votre BlackBerry Curve 9300, allez dans :
    Options (icône clé à molette) > Applications (ou Gestion des applications).
-2. Faites défiler vers l'onglet ou la liste "Tiers" (Third Party).
-3. Repérez l'entrée "unnamed 0.0" (ou "BBSmartBridge").
-4. Mettez-la en surbrillance, appuyez sur la touche MENU BlackBerry 
-   (touche physique à gauche du pavé tactile/trackpad).
-5. Sélectionnez "Supprimer" (Delete) et confirmez.
-6. Redémarrez le BlackBerry (retirez et remettez la batterie, ou pressez 
+2. Repérez "SmartBridge".
+3. Appuyez sur la touche MENU BlackBerry (à gauche du pavé tactile/trackpad).
+4. Sélectionnez "Supprimer" (Delete) et confirmez.
+5. Redémarrez le BlackBerry (retirez et remettez la batterie, ou pressez 
    Alt + Majuscule Gauche + Suppr).
 
 =============================================================================
-3. MÉTHODES D'INSTALLATION DE LA NOUVELLE VERSION
+3. RÉGLAGE DES PERMISSIONS APRÈS INSTALLATION (TRÈS IMPORTANT)
+=============================================================================
+Une fois la version 1.0.7 installée sur votre Curve 9300 :
+1. Allez dans : Options > Applications (ou Gestionnaire d'applications).
+2. Sélectionnez "SmartBridge".
+3. Appuyez sur la touche MENU BlackBerry > "Modifier les autorisations" (Edit Permissions).
+4. Définissez :
+   - Connexions (Connections) -> AUTORISER (Allow)
+   - Interactions -> AUTORISER (Allow)
+   - Données utilisateur (User Data) -> AUTORISER (Allow)
+5. Appuyez sur la touche ÉCHAP / Retour et choisissez "Enregistrer" (Save).
+Cette étape garantit que le Bluetooth et le stockage fonctionnent sans blocage.
+
+=============================================================================
+4. MÉTHODES D'INSTALLATION DE LA VERSION 1.0.7
 =============================================================================
 
 --- MÉTHODE 1 (RECOMMANDÉE SANS PC) : VIA CARTE MÉMOIRE (SD CARD) ---
-1. Téléchargez l'artefact ZIP généré par GitHub Actions : 
-   "BBSB_BlackBerry_Curve_9300_v1.0.6.zip" et décompressez-le sur votre ordinateur.
+1. Téléchargez le nouvel artefact ZIP généré par GitHub Actions : 
+   "BBSB_BlackBerry_Curve_9300_v1.0.7.zip" et décompressez-le.
 2. Copiez TOUS les fichiers suivants dans un même dossier sur votre carte micro SD 
-   (par exemple dans le dossier : SDCard/BBSB/) :
+   (par exemple : SDCard/BBSB/) :
    - BBSmartBridge.jad
-   - BBSmartBridge.cod (et tout fichier BBSmartBridge-*.cod s'il y en a)
+   - BBSmartBridge.cod (et tout éventuel BBSmartBridge-*.cod)
 3. Insérez la carte micro SD dans votre BlackBerry Curve 9300.
-4. Sur le téléphone, ouvrez l'application "Médias" (ou "Fichiers").
-5. Appuyez sur la touche MENU BlackBerry > "Explorer" (ou "Parcourir les fichiers").
+4. Ouvrez l'application "Médias" ou "Fichiers".
+5. Appuyez sur la touche MENU BlackBerry > "Explorer" (Parcourir les fichiers).
 6. Naviguez dans : Carte mémoire > BBSB.
 7. Cliquez sur "BBSmartBridge.jad".
-8. L'écran officiel d'installation BlackBerry s'ouvre :
+8. L'écran officiel d'installation affiche :
    - Nom : SmartBridge
-   - Version : 1.0.6
+   - Version : 1.0.7
    - Fournisseur : Hamza
    - Icône : Logo SmartBridge
-9. Cliquez sur "Télécharger" ou "Installer". L'installation prend quelques secondes.
+9. Cliquez sur "Télécharger" ou "Installer".
 
---- MÉTHODE 2 (ULTRA SIMPLE VIA PC) : AVEC BBSAK OU VNBBUTILS / JL_CMDER ---
+--- MÉTHODE 2 (PC DIRECT VIA USB) : AVEC BBSAK OU VNBBUTILS ---
 1. Connectez votre BlackBerry Curve 9300 au PC en USB.
-2. Lancez BBSAK (BlackBerry Swiss Army Knife) ou vnbbUtils.
-3. Entrez votre mot de passe si le terminal en a un, puis cliquez sur "Connect".
-4. Allez dans l'onglet "Install CODs" (ou "Load COD").
-5. Sélectionnez le fichier "BBSmartBridge.cod".
-6. L'outil injecte directement l'application dans la mémoire flash de l'appareil.
-7. Le BlackBerry redémarre automatiquement ou actualise sa liste d'icônes.
+2. Lancez BBSAK ou vnbbUtils.
+3. Cliquez sur "Connect".
+4. Dans "Install CODs" (ou "Load COD"), sélectionnez "BBSmartBridge.cod".
+5. L'application est chargée directement.
 
 --- MÉTHODE 3 : VIA BLACKBERRY DESKTOP SOFTWARE ---
 1. Connectez le BlackBerry au PC.
-2. Ouvrez BlackBerry Desktop Software (Desktop Manager).
-3. Cliquez sur "Applications" > "Importer" ou "Ajouter".
+2. Ouvrez BlackBerry Desktop Software.
+3. Allez dans "Applications" > "Importer".
 4. Sélectionnez le fichier "BBSmartBridge.alx".
-5. Cliquez sur "Appliquer" pour synchroniser et installer sur le mobile.
+5. Cliquez sur "Appliquer".
 
 =============================================================================
-4. COMMENT TROUVER ET LANCER L'APPLICATION SUR BLACKBERRY CURVE 9300
-=============================================================================
-Sur BlackBerry OS 6 (le système du Curve 9300) :
-
-1. DOSSIER "TÉLÉCHARGEMENTS" (DOWNLOADS) :
-   Par défaut, BlackBerry range toute nouvelle application tierce dans 
-   le dossier "Téléchargements" et non sur l'écran d'accueil principal.
-   - Ouvrez le dossier "Téléchargements" pour trouver l'icône "SmartBridge".
-
-2. VOLETS D'ACCUEIL :
-   - L'écran d'accueil d'OS 6 comporte 5 volets :
-     [ Tous ] [ Favoris ] [ Multimédia ] [ Téléchargements ] [ Fréquent ]
-   - Faites glisser le trackpad horizontalement pour vérifier le volet "Tous" 
-     et le volet "Téléchargements".
-
-3. AFFICHER LES ICÔNES MASQUÉES :
-   - Sur l'écran d'accueil, appuyez sur la touche physique MENU BlackBerry.
-   - Cliquez sur "Afficher tous" (Show All).
-   - Si l'icône était masquée, elle devient visible. 
-     Faites Menu > "Déplacer" pour la positionner où vous voulez.
-
-=============================================================================
-Profitez de votre compagnon Bluetooth SmartBridge sur votre BlackBerry Curve 9300 !
+Profitez de votre application SmartBridge v1.0.7 sur votre BlackBerry Curve 9300 !
 =============================================================================
