@@ -10,7 +10,7 @@
 
     <target name="generate-rapc">
         <echo file="BBSmartBridge.rapc">MIDlet-Name: SmartBridge
-MIDlet-Version: 1.0.7
+MIDlet-Version: 1.0.8
 MIDlet-Vendor: Hamza
 MIDlet-Description: Android Bluetooth Companion for BlackBerry
 MIDlet-Jar-URL: BBSmartBridge.jar
@@ -28,7 +28,7 @@ RIM-MIDlet-Position-1: 0</echo>
     &lt;application id="BBSmartBridge"&gt;
         &lt;name&gt;SmartBridge&lt;/name&gt;
         &lt;description&gt;Android Bluetooth Companion for BlackBerry&lt;/description&gt;
-        &lt;version&gt;1.0.7&lt;/version&gt;
+        &lt;version&gt;1.0.8&lt;/version&gt;
         &lt;vendor&gt;Hamza&lt;/vendor&gt;
         &lt;copyright&gt;Copyright (c) 2024 Hamza&lt;/copyright&gt;
         &lt;fileset Java="1.54" _blackberryVersion="[5.0.0)"&gt;
@@ -87,7 +87,7 @@ RIM-MIDlet-Position-1: 0</echo>
         <jar destfile="BBSmartBridge.jar" basedir="${classes.dir}">
             <manifest>
                 <attribute name="MIDlet-Name" value="SmartBridge"/>
-                <attribute name="MIDlet-Version" value="1.0.7"/>
+                <attribute name="MIDlet-Version" value="1.0.8"/>
                 <attribute name="MIDlet-Vendor" value="Hamza"/>
                 <attribute name="MIDlet-1" value="SmartBridge,icon.png,com.hamza.blackberrybridge.SmartBridgeApp"/>
                 <attribute name="MIDlet-Permissions" value="javax.microedition.io.Connector.bluetooth.client, javax.microedition.io.Connector.bluetooth.server"/>
@@ -157,7 +157,7 @@ RIM-MIDlet-Position-1: 0</echo>
         
         <echo message="====================================================="/>
         <echo message="BUILD SUCCESSFUL: Valid BBSmartBridge.cod and BBSmartBridge.jad are ready!"/>
-        <echo message="Application: SmartBridge v1.0.7 (Hamza) with custom icon"/>
+        <echo message="Application: SmartBridge v1.0.8 (Hamza) with custom icon"/>
         <echo message="====================================================="/>
     </target>
 

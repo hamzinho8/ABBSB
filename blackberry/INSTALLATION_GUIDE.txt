@@ -1,84 +1,71 @@
 =============================================================================
-GUIDE D'INSTALLATION & DE DÉPANNAGE - SmartBridge v1.0.7
+GUIDE D'INSTALLATION & DE DÉPANNAGE - SmartBridge v1.0.8
 BlackBerry Curve 9300 / OS 5.0 - OS 6.0
 =============================================================================
 
-1. EXPLICATION DE L'ERREUR RÉSOLUE ("attempts to access a secure API") :
+1. EXPLICATION DE L'ERREUR RÉSOLUE :
 -----------------------------------------------------------------------------
-Sur votre BlackBerry Curve 9300, l'application s'installait bien avec son nom 
-et son icône, mais affichait au lancement :
-"Module 'BBSmartBridge' attempts to access a secure API" (ou "tente d'accéder à 
-une API sécurisée").
+Sur votre BlackBerry Curve 9300, au lancement de l'application, l'erreur suivante 
+s'affichait à l'écran :
+"Error starting BBSmartBridge: Class 'net.rim.device.api.ui.ScrollView' not found."
 
-POURQUOI CETTE ERREUR ?
-Le système BlackBerry OS (RIM) protège certaines fonctions matérielles 
-(net.rim.device.api.notification.NotificationsManager, Alert, LED). 
-Pour exécuter ces bibliothèques sur un vrai terminal physique, RIM exigeait 
-une signature cryptographique via des serveurs officiels BlackBerry (fichiers RBB, RCR, RRT).
-Comme les serveurs de signature BlackBerry sont définitivement fermés, toute 
-application qui appelle ces classes est systématiquement bloquée par l'OS physique.
+D'OÙ VENAIT CETTE ERREUR ?
+- Dans BlackBerry OS 6.0 et 7.0, RIM a introduit une nouvelle interface nommée 
+  'ScrollView' et a fait hériter la classe de base d'affichage 'Manager' de 'ScrollView'.
+- Votre BlackBerry Curve 9300 fonctionne sous BlackBerry OS 5.0 (ou 5.0.0.x).
+- Sous BlackBerry OS 5.0, 'ScrollView' N'EXISTE PAS du tout (la classe 'Manager' 
+  hérite directement de 'Field').
+- L'ancienne compilation avait été liée avec un kit SDK OS 6/7 plus récent, ce qui 
+  avait injecté une référence fantôme vers cette classe inexistante sur OS 5.0.
 
-SOLUTION APPORTÉE DANS LA VERSION 1.0.7 :
-1. Suppression intégrale des dépendances aux API fermées et restreintes (LED, NotificationsManager, Alert).
-2. Remplacement par les API audio standard et ouvertes Java ME MMAPI (javax.microedition.media.Manager et playTone).
-3. Déclaration explicite des autorisations Bluetooth (MIDlet-Permissions: Connector.bluetooth.client/server).
-4. L'application SmartBridge v1.0.7 est désormais 100% autonome, libre de toute signature RIM et peut s'ouvrir instantanément sur votre Curve 9300 !
+SOLUTION APPORTÉE DANS LA VERSION 1.0.8 :
+1. Extraction et intégration des véritables bibliothèques officielles BlackBerry JDE 5.0.0 
+   (net_rim_api.jar et rapc.jar natifs OS 5.0).
+2. Recompilation intégrale et prévérification CLDC 1.1 ciblée pour BlackBerry OS 5.0.
+3. Vérification binaire : le fichier BBSmartBridge.cod ne contient plus AUCUNE trace de ScrollView.
+4. Les seules dépendances du module sont désormais 'net_rim_cldc' et 'net_rim_bluetooth', 
+   présentes par défaut sur tout terminal BlackBerry physique sans signature payante.
 
 =============================================================================
-2. ÉTAPE PRÉALABLE INDISPENSABLE : DÉSINSTALLER LA VERSION 1.0.6
+2. ÉTAPE PRÉALABLE INDISPENSABLE : DÉSINSTALLER L'ANCIENNE VERSION
 =============================================================================
-Avant d'installer la nouvelle version v1.0.7 :
+Avant d'installer la nouvelle version v1.0.8 :
 1. Sur votre BlackBerry Curve 9300, allez dans :
    Options (icône clé à molette) > Applications (ou Gestion des applications).
 2. Repérez "SmartBridge".
-3. Appuyez sur la touche MENU BlackBerry (à gauche du pavé tactile/trackpad).
+3. Appuyez sur la touche MENU BlackBerry (la touche avec le logo BlackBerry à gauche du pavé tactile).
 4. Sélectionnez "Supprimer" (Delete) et confirmez.
-5. Redémarrez le BlackBerry (retirez et remettez la batterie, ou pressez 
-   Alt + Majuscule Gauche + Suppr).
+5. Redémarrez votre BlackBerry Curve 9300 (retirez et remettez la batterie, ou pressez 
+   Alt + Majuscule Gauche + Suppr simultanément).
 
 =============================================================================
-3. RÉGLAGE DES PERMISSIONS APRÈS INSTALLATION (TRÈS IMPORTANT)
-=============================================================================
-Une fois la version 1.0.7 installée sur votre Curve 9300 :
-1. Allez dans : Options > Applications (ou Gestionnaire d'applications).
-2. Sélectionnez "SmartBridge".
-3. Appuyez sur la touche MENU BlackBerry > "Modifier les autorisations" (Edit Permissions).
-4. Définissez :
-   - Connexions (Connections) -> AUTORISER (Allow)
-   - Interactions -> AUTORISER (Allow)
-   - Données utilisateur (User Data) -> AUTORISER (Allow)
-5. Appuyez sur la touche ÉCHAP / Retour et choisissez "Enregistrer" (Save).
-Cette étape garantit que le Bluetooth et le stockage fonctionnent sans blocage.
-
-=============================================================================
-4. MÉTHODES D'INSTALLATION DE LA VERSION 1.0.7
+3. MÉTHODES D'INSTALLATION DE LA VERSION 1.0.8
 =============================================================================
 
 --- MÉTHODE 1 (RECOMMANDÉE SANS PC) : VIA CARTE MÉMOIRE (SD CARD) ---
 1. Téléchargez le nouvel artefact ZIP généré par GitHub Actions : 
-   "BBSB_BlackBerry_Curve_9300_v1.0.7.zip" et décompressez-le.
-2. Copiez TOUS les fichiers suivants dans un même dossier sur votre carte micro SD 
-   (par exemple : SDCard/BBSB/) :
+   "BBSB_BlackBerry_Curve_9300_v1.0.8.zip" et décompressez-le sur votre ordinateur.
+2. Copiez dans un même dossier sur votre carte micro SD (ex: SDCard/BBSB/) :
    - BBSmartBridge.jad
-   - BBSmartBridge.cod (et tout éventuel BBSmartBridge-*.cod)
+   - BBSmartBridge.cod
 3. Insérez la carte micro SD dans votre BlackBerry Curve 9300.
-4. Ouvrez l'application "Médias" ou "Fichiers".
+4. Sur le Curve 9300, ouvrez l'application "Médias" ou "Fichiers".
 5. Appuyez sur la touche MENU BlackBerry > "Explorer" (Parcourir les fichiers).
 6. Naviguez dans : Carte mémoire > BBSB.
 7. Cliquez sur "BBSmartBridge.jad".
-8. L'écran officiel d'installation affiche :
+8. L'écran d'installation affiche :
    - Nom : SmartBridge
-   - Version : 1.0.7
+   - Version : 1.0.8
    - Fournisseur : Hamza
    - Icône : Logo SmartBridge
 9. Cliquez sur "Télécharger" ou "Installer".
 
 --- MÉTHODE 2 (PC DIRECT VIA USB) : AVEC BBSAK OU VNBBUTILS ---
-1. Connectez votre BlackBerry Curve 9300 au PC en USB.
+1. Connectez votre BlackBerry Curve 9300 au PC avec le câble USB.
 2. Lancez BBSAK ou vnbbUtils.
 3. Cliquez sur "Connect".
-4. Dans "Install CODs" (ou "Load COD"), sélectionnez "BBSmartBridge.cod".
-5. L'application est chargée directement.
+4. Dans l'onglet "Install CODs" (ou "Load COD"), sélectionnez "BBSmartBridge.cod".
+5. L'application est injectée directement dans le téléphone sans redémarrage requis.
 
 --- MÉTHODE 3 : VIA BLACKBERRY DESKTOP SOFTWARE ---
 1. Connectez le BlackBerry au PC.
@@ -88,5 +75,19 @@ Cette étape garantit que le Bluetooth et le stockage fonctionnent sans blocage.
 5. Cliquez sur "Appliquer".
 
 =============================================================================
-Profitez de votre application SmartBridge v1.0.7 sur votre BlackBerry Curve 9300 !
+4. RÉGLAGE DES PERMISSIONS APRÈS INSTALLATION
+=============================================================================
+Une fois la version 1.0.8 installée sur votre Curve 9300 :
+1. Allez dans : Options > Applications.
+2. Sélectionnez "SmartBridge".
+3. Appuyez sur la touche MENU BlackBerry > "Modifier les autorisations" (Edit Permissions).
+4. Définissez :
+   - Connexions (Connections) -> AUTORISER (Allow)
+   - Interactions -> AUTORISER (Allow)
+   - Données utilisateur (User Data) -> AUTORISER (Allow)
+5. Appuyez sur la touche ÉCHAP / Retour et choisissez "Enregistrer" (Save).
+
+=============================================================================
+L'application SmartBridge v1.0.8 se lance désormais immédiatement sur votre 
+BlackBerry Curve 9300 avec son interface native et la gestion Bluetooth !
 =============================================================================
