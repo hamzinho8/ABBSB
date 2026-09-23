@@ -2,7 +2,6 @@ package com.hamza.blackberrybridge;
 
 import java.util.Vector;
 
-
 public class ProtocolManager {
     private ConnectionManager connectionManager;
     private SmartBridgeApp app;
@@ -19,17 +18,27 @@ public class ProtocolManager {
         if (parts.length == 0) return;
         
         String command = parts[0];
+        LogManager.log("PROTOCOL", "Processing command: " + command);
         
         try {
             if (command.equals("PING")) {
                 connectionManager.sendData("PONG\n");
             } 
+            else if (command.equals("PONG")) {
+                // Heartbeat response from Android
+            }
             else if (command.equals("HELLO")) {
                 connectionManager.sendData("HELLO|BSB/1|BLACKBERRY_9790\n");
                 connectionManager.sendData("READY\n");
             }
+            else if (command.equals("READY")) {
+                // Handshake acknowledged by Android
+            }
             else if (command.equals("PHONE_BATTERY") || command.equals("BATTERY")) {
                 if (parts.length > 1) app.getUIManager().updateBattery(parts[1]);
+            }
+            else if (command.equals("GET_PHONE_BATTERY") || command.equals("GET_BATTERY")) {
+                connectionManager.sendData("BATTERY|" + BatteryManager.getBatteryLevel() + "\n");
             }
             else if (command.equals("NOTIFICATION")) {
                 if (parts.length >= 5) {
@@ -92,7 +101,7 @@ public class ProtocolManager {
                 // Clipboard sync disabled due to signature requirement
             }
             else {
-                connectionManager.sendData("ERROR|UNKNOWN_COMMAND\n");
+                LogManager.log("PROTOCOL", "Unknown command: " + command);
             }
         } catch (Exception e) {
             LogManager.error("PROTOCOL", "Parse error: " + e.getMessage());

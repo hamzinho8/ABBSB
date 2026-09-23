@@ -1,93 +1,101 @@
 =============================================================================
-GUIDE D'INSTALLATION & DE DÉPANNAGE - SmartBridge v1.0.8
-BlackBerry Curve 9300 / OS 5.0 - OS 6.0
+GUIDE D'INSTALLATION & DE CONNEXION BLUETOOTH - SmartBridge v1.0.9
+BlackBerry Curve 9300 / OS 5.0 - OS 6.0 & Android Companion
 =============================================================================
 
-1. EXPLICATION DE L'ERREUR RÉSOLUE :
+1. EXPLICATION DE L'ANOMALIE BLUETOOTH (LED BLEUE CLIGNOTANTE) :
 -----------------------------------------------------------------------------
-Sur votre BlackBerry Curve 9300, au lancement de l'application, l'erreur suivante 
-s'affichait à l'écran :
-"Error starting BBSmartBridge: Class 'net.rim.device.api.ui.ScrollView' not found."
+Sur votre BlackBerry Curve 9300, l'application s'ouvrait correctement avec la 
+mention "[BT: WAIT]", mais la LED bleue clignotait sans cesse et rien ne se 
+passait sur l'application Android ("BB Compagnon").
 
-D'OÙ VENAIT CETTE ERREUR ?
-- Dans BlackBerry OS 6.0 et 7.0, RIM a introduit une nouvelle interface nommée 
-  'ScrollView' et a fait hériter la classe de base d'affichage 'Manager' de 'ScrollView'.
-- Votre BlackBerry Curve 9300 fonctionne sous BlackBerry OS 5.0 (ou 5.0.0.x).
-- Sous BlackBerry OS 5.0, 'ScrollView' N'EXISTE PAS du tout (la classe 'Manager' 
-  hérite directement de 'Field').
-- L'ancienne compilation avait été liée avec un kit SDK OS 6/7 plus récent, ce qui 
-  avait injecté une référence fantôme vers cette classe inexistante sur OS 5.0.
+D'OÙ VENAIT CE COMPORTEMENT ?
+1. Inversion Rôle Serveur / Client :
+   - Dans votre application Android ("BB Compagnon" / Système Bridge), l'écran
+     affiche la liste des appareils Bluetooth scannés ou jumelés ("BlackBerry 9300").
+   - Lorsque vous cliquez sur "BlackBerry 9300" sur votre smartphone Android,
+     votre Android agit en CLIENT Bluetooth RFCOMM et tente d'ouvrir une socket
+     vers le BlackBerry.
+   - Mais sur le BlackBerry, l'ancienne version exécutait une recherche cliente 
+     infinie ("startInquiry") au lieu de démarrer un SERVEUR d'écoute !
+   - Le BlackBerry n'écoutait sur aucun port RFCOMM (aucun serveur "StreamConnectionNotifier"
+     n'était actif). La tentative de connexion depuis l'Android échouait donc
+     instantanément ("Connexion refusée" / "Socket fermé").
 
-SOLUTION APPORTÉE DANS LA VERSION 1.0.8 :
-1. Extraction et intégration des véritables bibliothèques officielles BlackBerry JDE 5.0.0 
-   (net_rim_api.jar et rapc.jar natifs OS 5.0).
-2. Recompilation intégrale et prévérification CLDC 1.1 ciblée pour BlackBerry OS 5.0.
-3. Vérification binaire : le fichier BBSmartBridge.cod ne contient plus AUCUNE trace de ScrollView.
-4. Les seules dépendances du module sont désormais 'net_rim_cldc' et 'net_rim_bluetooth', 
-   présentes par défaut sur tout terminal BlackBerry physique sans signature payante.
-
-=============================================================================
-2. ÉTAPE PRÉALABLE INDISPENSABLE : DÉSINSTALLER L'ANCIENNE VERSION
-=============================================================================
-Avant d'installer la nouvelle version v1.0.8 :
-1. Sur votre BlackBerry Curve 9300, allez dans :
-   Options (icône clé à molette) > Applications (ou Gestion des applications).
-2. Repérez "SmartBridge".
-3. Appuyez sur la touche MENU BlackBerry (la touche avec le logo BlackBerry à gauche du pavé tactile).
-4. Sélectionnez "Supprimer" (Delete) et confirmez.
-5. Redémarrez votre BlackBerry Curve 9300 (retirez et remettez la batterie, ou pressez 
-   Alt + Majuscule Gauche + Suppr simultanément).
+2. Conflit Radio et Clignotement de la LED Bleue :
+   - L'ancienne boucle d'inquiry ("startInquiry") forçait la radio Bluetooth du
+     BlackBerry à émettre des paquets de recherche d'appareils en permanence,
+     ce qui déclenchait le clignotement continu de la LED bleue.
+   - Pire : sur les puces Bluetooth (comme celle du Curve 9300), le mode Inquiry actif
+     sature la radio et bloque la réception des paquets de connexion ("Page Scan")
+     émis par l'Android !
 
 =============================================================================
-3. MÉTHODES D'INSTALLATION DE LA VERSION 1.0.8
+2. SOLUTIONS APPORTÉES DANS LA VERSION 1.0.9 :
 =============================================================================
+1. Serveur Bluetooth RFCOMM Dédié (BluetoothServer.java) :
+   - Le BlackBerry démarre désormais un vrai serveur d'écoute Bluetooth SPP
+     dès l'ouverture de l'application.
+   - Il écoute en continu sur l'UUID personnalisé utilisé par votre application Android :
+     UUID: 27B4426543A74744A6F1C20531AE40F1 (27b44265-43a7-4744-a6f1-c20531ae40f1)
+   - Un écouteur de secours est également activé sur l'UUID SPP standard (0x1101).
+   - Plus de boucle "startInquiry" bloquante : la LED ne clignotera plus dans le vide !
 
---- MÉTHODE 1 (RECOMMANDÉE SANS PC) : VIA CARTE MÉMOIRE (SD CARD) ---
-1. Téléchargez le nouvel artefact ZIP généré par GitHub Actions : 
-   "BBSB_BlackBerry_Curve_9300_v1.0.8.zip" et décompressez-le sur votre ordinateur.
-2. Copiez dans un même dossier sur votre carte micro SD (ex: SDCard/BBSB/) :
-   - BBSmartBridge.jad
-   - BBSmartBridge.cod
-3. Insérez la carte micro SD dans votre BlackBerry Curve 9300.
-4. Sur le Curve 9300, ouvrez l'application "Médias" ou "Fichiers".
-5. Appuyez sur la touche MENU BlackBerry > "Explorer" (Parcourir les fichiers).
-6. Naviguez dans : Carte mémoire > BBSB.
-7. Cliquez sur "BBSmartBridge.jad".
-8. L'écran d'installation affiche :
-   - Nom : SmartBridge
-   - Version : 1.0.8
-   - Fournisseur : Hamza
-   - Icône : Logo SmartBridge
-9. Cliquez sur "Télécharger" ou "Installer".
+2. Négociation et Protocole BSB/1 Fiabilisés :
+   - Dès la connexion depuis l'Android, le BlackBerry accepte instantanément la liaison,
+     envoie la négociation "HELLO|BSB/1|BLACKBERRY_9790" puis "READY", et échange les
+     niveaux de batterie ("BATTERY|<niveau>", "GET_PHONE_BATTERY").
+   - L'écran du BlackBerry bascule immédiatement de "[BT: WAIT]" à "[BT: ON]" (vert).
+   - L'application Android affiche le BlackBerry connecté.
 
---- MÉTHODE 2 (PC DIRECT VIA USB) : AVEC BBSAK OU VNBBUTILS ---
-1. Connectez votre BlackBerry Curve 9300 au PC avec le câble USB.
-2. Lancez BBSAK ou vnbbUtils.
-3. Cliquez sur "Connect".
-4. Dans l'onglet "Install CODs" (ou "Load COD"), sélectionnez "BBSmartBridge.cod".
-5. L'application est injectée directement dans le téléphone sans redémarrage requis.
-
---- MÉTHODE 3 : VIA BLACKBERRY DESKTOP SOFTWARE ---
-1. Connectez le BlackBerry au PC.
-2. Ouvrez BlackBerry Desktop Software.
-3. Allez dans "Applications" > "Importer".
-4. Sélectionnez le fichier "BBSmartBridge.alx".
-5. Cliquez sur "Appliquer".
+3. Options Manuelles Ajoutées au Menu BlackBerry :
+   - Appuyez sur la touche MENU BlackBerry (logo BB à gauche du trackpad) :
+     * "Relancer Bluetooth" : réinitialise proprement le serveur d'écoute.
+     * "Connecter à l'Android" : tente une connexion vers les appareils déjà jumelés
+       dans les réglages du BlackBerry (sans balayage radio intrusif).
 
 =============================================================================
-4. RÉGLAGE DES PERMISSIONS APRÈS INSTALLATION
+3. PROCÉDURE DE JUMELAGE ET DE CONNEXION ÉTAPE PAR ÉTAPE :
 =============================================================================
-Une fois la version 1.0.8 installée sur votre Curve 9300 :
-1. Allez dans : Options > Applications.
-2. Sélectionnez "SmartBridge".
-3. Appuyez sur la touche MENU BlackBerry > "Modifier les autorisations" (Edit Permissions).
-4. Définissez :
-   - Connexions (Connections) -> AUTORISER (Allow)
-   - Interactions -> AUTORISER (Allow)
-   - Données utilisateur (User Data) -> AUTORISER (Allow)
-5. Appuyez sur la touche ÉCHAP / Retour et choisissez "Enregistrer" (Save).
+Pour assurer une liaison parfaite entre votre Curve 9300 et votre smartphone Android :
+
+ÉTAPE A : Jumeler une bonne fois pour toutes les deux téléphones dans l'OS
+1. Sur le BlackBerry Curve 9300 :
+   - Allez dans : "Gérer les connexions" > Cochez "Bluetooth".
+   - Allez dans : "Options Bluetooth" (ou Options > Réseaux et connexions > Connexions Bluetooth).
+   - Réglez "Détectable" (Discoverable) sur : "Oui" (Yes).
+2. Sur votre Smartphone Android :
+   - Allez dans les Paramètres Bluetooth d'Android.
+   - Cliquez sur "Associer un nouvel appareil".
+   - Sélectionnez "BlackBerry 9300".
+   - Confirmez le code PIN / le mot de passe sur les deux écrans (ex: 0000 ou 1234).
+   - Une fois associé, ils sont officiellement jumelés.
+
+ÉTAPE B : Autoriser les connexions sur le BlackBerry
+1. Sur le BlackBerry Curve 9300, dans "Appareils Bluetooth jumelés" :
+   - Mettez en surbrillance votre smartphone Android.
+   - Touche MENU BlackBerry > "Propriétés de l'appareil".
+   - Réglez "Approuvé" (Trusted) sur : "Oui".
+   - Cela évitera les demandes de confirmation intempestives.
+
+ÉTAPE C : Lancer l'application SmartBridge
+1. Installez et ouvrez SmartBridge v1.0.9 sur votre BlackBerry Curve 9300.
+   - En haut à gauche, vous verrez "[BT: WAIT]". Le serveur Bluetooth est en écoute.
+2. Ouvrez l'application "BB Compagnon" (Système Bridge) sur votre smartphone Android.
+3. Dans la liste des appareils Bluetooth qui s'affiche, touchez :
+   "BlackBerry 9300".
+4. MAGIE : 
+   - Le statut passe à "[BT: ON]" en vert sur le BlackBerry !
+   - Le pourcentage de batterie de votre smartphone Android s'affiche : "[Ph: xx%]".
+   - Les notifications (SMS, WhatsApp, appels) et contrôles multimédias sont actifs !
 
 =============================================================================
-L'application SmartBridge v1.0.8 se lance désormais immédiatement sur votre 
-BlackBerry Curve 9300 avec son interface native et la gestion Bluetooth !
+4. COMMENT INSTALLER LA MISE À JOUR v1.0.9 SUR LE CURVE 9300 :
 =============================================================================
+Méthode Carte SD (Très simple) :
+1. Téléchargez "BBSB_BlackBerry_Curve_9300_v1.0.9.zip" (ou récupérez BBSmartBridge.jad et .cod).
+2. Copiez les deux fichiers sur votre carte Micro SD dans un dossier (ex: SDCard/BBSB/).
+3. Sur votre Curve 9300, ouvrez "Médias" ou "Fichiers" > Touche MENU > "Explorer".
+4. Allez dans le dossier et cliquez sur "BBSmartBridge.jad".
+5. Cliquez sur "Télécharger" / "Remplacer" pour installer la v1.0.9.
+6. Lancez SmartBridge !

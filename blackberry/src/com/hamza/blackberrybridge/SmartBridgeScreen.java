@@ -225,5 +225,15 @@ public class SmartBridgeScreen extends MainScreen {
                 app.getConnectionManager().sendData("FIND_PHONE_STOP\n");
             }
         });
+        menu.add(new net.rim.device.api.ui.MenuItem("Relancer Bluetooth", 110, 20) {
+            public void run() {
+                app.getConnectionManager().restartServer();
+            }
+        });
+        menu.add(new net.rim.device.api.ui.MenuItem("Connecter à l'Android", 110, 21) {
+            public void run() {
+                app.getConnectionManager().connectToPairedDevice();
+            }
+        });
     }
 }

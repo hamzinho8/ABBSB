@@ -94,14 +94,14 @@ public class SettingsScreen extends MainScreen {
                 app.getConnectionManager().sendData("FIND_PHONE\n");
             }
         });
-        DarkButtonField btnSyncClip = new DarkButtonField("Sync Clip", 130, 40);
-        btnSyncClip.setChangeListener(new FieldChangeListener() {
+        DarkButtonField btnRestartBT = new DarkButtonField("Relancer BT", 130, 40);
+        btnRestartBT.setChangeListener(new FieldChangeListener() {
             public void fieldChanged(Field field, int context) {
-                // Clipboard sync disabled due to signature requirement
+                app.getConnectionManager().restartServer();
             }
         });
         hfmActions.add(btnFindPhone);
-        hfmActions.add(btnSyncClip);
+        hfmActions.add(btnRestartBT);
         add(hfmActions);
         
         add(new SeparatorField());

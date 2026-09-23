@@ -4,7 +4,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 
 public class ConnectionManager {
-    private BluetoothClient btClient;
+    private BluetoothServer btServer;
     private ProtocolManager protocolManager;
     private UIManager uiManager;
     private long lastDataTime = 0;
@@ -16,22 +16,39 @@ public class ConnectionManager {
         this.protocolManager = new ProtocolManager(this, app);
     }
     
-    public void startServer() {
+    public synchronized void startServer() {
         uiManager.updateConnectionStatus("CONNECTING");
-        if (btClient != null) {
-            btClient.stopClient();
+        if (btServer != null) {
+            btServer.stopServer();
         }
-        btClient = new BluetoothClient(this);
-        btClient.start();
+        btServer = new BluetoothServer(this);
+        btServer.startServer();
         
         startWatchdog();
     }
     
-    public void stopServer() {
+    public synchronized void stopServer() {
         stopWatchdog();
-        if (btClient != null) {
-            btClient.stopClient();
-            btClient = null;
+        stopWeatherTimer();
+        if (btServer != null) {
+            btServer.stopServer();
+            btServer = null;
+        }
+        uiManager.updateConnectionStatus("DISCONNECTED");
+    }
+
+    public synchronized void restartServer() {
+        LogManager.log("ConnMgr", "Restarting Bluetooth Server...");
+        stopServer();
+        try {
+            Thread.sleep(500);
+        } catch (Exception e) {}
+        startServer();
+    }
+
+    public void connectToPairedDevice() {
+        if (btServer != null) {
+            btServer.connectToPairedDevice();
         }
     }
     
@@ -40,19 +57,19 @@ public class ConnectionManager {
         watchdogTimer = new Timer();
         watchdogTimer.schedule(new TimerTask() {
             public void run() {
-                if (btClient != null && btClient.isConnected()) {
+                if (btServer != null && btServer.isConnected()) {
                     long now = System.currentTimeMillis();
-                    // If no data for 20 seconds, connection might be dead
-                    if (now - lastDataTime > 20000) {
-                        LogManager.error("ConnMgr", "Watchdog timeout. Restarting connection.");
-                        btClient.forceDisconnect();
-                    } else {
-                        // Send PING
+                    // If no data received for 60 seconds, connection might be stale
+                    if (now - lastDataTime > 60000) {
+                        LogManager.error("ConnMgr", "Watchdog timeout (60s silence). Restarting link.");
+                        btServer.forceDisconnect();
+                    } else if (now - lastDataTime > 15000) {
+                        // Send periodic PING heartbeat
                         sendData("PING\n");
                     }
                 }
             }
-        }, 10000, 10000); // Check every 10 seconds
+        }, 15000, 15000);
     }
     
     private void stopWatchdog() {
@@ -67,7 +84,7 @@ public class ConnectionManager {
         weatherTimer = new Timer();
         weatherTimer.schedule(new TimerTask() {
             public void run() {
-                if (btClient != null && btClient.isConnected()) {
+                if (btServer != null && btServer.isConnected()) {
                     sendData("WEATHER\n");
                 }
             }
@@ -83,18 +100,22 @@ public class ConnectionManager {
     
     public void onConnected() {
         lastDataTime = System.currentTimeMillis();
-        LogManager.log("ConnMgr", "Android connected");
+        LogManager.log("ConnMgr", "Android connected successfully");
         uiManager.updateConnectionStatus("CONNECTED");
+
+        // Send full BSB/1 protocol handshake and initial sync
+        sendData("HELLO|BSB/1|BLACKBERRY_9790\n");
+        sendData("READY\n");
+        sendData("BATTERY|" + BatteryManager.getBatteryLevel() + "\n");
         sendData("GET_PHONE_BATTERY\n");
         sendData("WEATHER\n");
         startWeatherTimer();
     }
     
     public void onDisconnected() {
-        LogManager.log("ConnMgr", "Connection lost");
+        LogManager.log("ConnMgr", "Connection lost, server still listening for incoming reconnection");
         uiManager.updateConnectionStatus("DISCONNECTED");
         stopWeatherTimer();
-        // BluetoothClient has its own retry loop now. We do NOT call startServer() here.
     }
     
     public void onDataReceived(String data) {
@@ -103,10 +124,14 @@ public class ConnectionManager {
     }
     
     public void sendData(String data) {
-        if (btClient != null) {
-            btClient.send(data);
+        if (btServer != null) {
+            btServer.send(data);
         } else {
-            LogManager.error("ConnMgr", "Cannot send, disconnected");
+            LogManager.error("ConnMgr", "Cannot send, server not initialized");
         }
+    }
+
+    public boolean isConnected() {
+        return btServer != null && btServer.isConnected();
     }
 }
