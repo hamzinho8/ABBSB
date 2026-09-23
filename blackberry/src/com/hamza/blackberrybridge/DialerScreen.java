@@ -4,18 +4,15 @@ import net.rim.device.api.ui.*;
 import net.rim.device.api.ui.component.*;
 import net.rim.device.api.ui.container.*;
 import net.rim.device.api.ui.decor.*;
-import net.rim.device.api.system.Application;
 
 public class DialerScreen extends MainScreen {
     
     private BasicEditField phoneField;
-    private CallManager callManager;
     private SmartBridgeApp app;
     
     public DialerScreen(SmartBridgeApp app, CallManager callManager) {
         super(MainScreen.VERTICAL_SCROLL | MainScreen.VERTICAL_SCROLLBAR);
         this.app = app;
-        this.callManager = callManager;
         
         getMainManager().setBackground(BackgroundFactory.createSolidBackground(Color.BLACK));
         
@@ -74,7 +71,7 @@ public class DialerScreen extends MainScreen {
         if (number != null && number.length() > 0) {
             app.getConnectionManager().sendData("CALL_OUTBOUND|" + number + "\n");
             
-            Application.getApplication().invokeLater(new Runnable() {
+            UiApplication.getUiApplication().invokeLater(new Runnable() {
                 public void run() {
                     Dialog.inform("Appel lancé vers " + phoneField.getText().trim());
                 }
@@ -82,7 +79,7 @@ public class DialerScreen extends MainScreen {
             
             close();
         } else {
-            Application.getApplication().invokeLater(new Runnable() {
+            UiApplication.getUiApplication().invokeLater(new Runnable() {
                 public void run() {
                     Dialog.alert("Veuillez saisir un numéro.");
                 }
@@ -103,7 +100,7 @@ public class DialerScreen extends MainScreen {
     }
     
     // --- Custom UI Component for Colored Buttons ---
-    private class CallButtonField extends Field {
+    private static class CallButtonField extends Field {
         private String label;
         private int bgColor;
         private int focusColor;

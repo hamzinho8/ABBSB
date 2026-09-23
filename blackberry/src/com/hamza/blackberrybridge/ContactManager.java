@@ -1,7 +1,7 @@
 package com.hamza.blackberrybridge;
 
 import java.util.Vector;
-import net.rim.device.api.system.Application;
+import net.rim.device.api.ui.UiApplication;
 
 public class ContactManager {
     private SmartBridgeApp app;
@@ -30,7 +30,7 @@ public class ContactManager {
         contacts.addElement(c);
         
         if (activeScreen != null) {
-            Application.getApplication().invokeLater(new Runnable() {
+            UiApplication.getUiApplication().invokeLater(new Runnable() {
                 public void run() {
                     activeScreen.addContactToUI(c);
                 }
@@ -40,7 +40,7 @@ public class ContactManager {
     
     public void handleContactsEnd(String countStr) {
         if (activeScreen != null) {
-            Application.getApplication().invokeLater(new Runnable() {
+            UiApplication.getUiApplication().invokeLater(new Runnable() {
                 public void run() {
                     activeScreen.refreshList();
                 }

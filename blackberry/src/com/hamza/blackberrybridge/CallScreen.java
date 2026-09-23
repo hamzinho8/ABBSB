@@ -4,7 +4,6 @@ import net.rim.device.api.ui.*;
 import net.rim.device.api.ui.component.*;
 import net.rim.device.api.ui.container.*;
 import net.rim.device.api.ui.decor.*;
-import net.rim.device.api.system.Application;
 
 public class CallScreen extends MainScreen {
     private CallManager callManager;
@@ -76,7 +75,7 @@ public class CallScreen extends MainScreen {
     }
     
     public void setStatus(final String status) {
-        Application.getApplication().invokeLater(new Runnable() {
+        UiApplication.getUiApplication().invokeLater(new Runnable() {
             public void run() {
                 statusLabel.setText(status);
                 if (status.equals("Active")) {
@@ -112,7 +111,7 @@ public class CallScreen extends MainScreen {
     }
     
     // --- Custom UI Component for Colored Buttons ---
-    private class CallButtonField extends Field {
+    private static class CallButtonField extends Field {
         private String label;
         private int bgColor;
         private int focusColor;

@@ -7,14 +7,12 @@ public class ConnectionManager {
     private BluetoothClient btClient;
     private ProtocolManager protocolManager;
     private UIManager uiManager;
-    private SmartBridgeApp app;
     private long lastDataTime = 0;
     private Timer watchdogTimer;
     private Timer weatherTimer;
     
     public ConnectionManager(UIManager uiManager, SmartBridgeApp app) {
         this.uiManager = uiManager;
-        this.app = app;
         this.protocolManager = new ProtocolManager(this, app);
     }
     

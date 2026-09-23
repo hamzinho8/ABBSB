@@ -8,12 +8,10 @@ import java.util.Vector;
 
 public class NotificationListScreen extends MainScreen {
     private NotificationManager notifManager;
-    private SmartBridgeApp app;
     private VerticalFieldManager listContainer;
     
     public NotificationListScreen(NotificationManager nm, SmartBridgeApp app) {
         this.notifManager = nm;
-        this.app = app;
         
         getMainManager().setBackground(BackgroundFactory.createSolidBackground(Color.BLACK));
         DarkLabelField title = new DarkLabelField("NOTIFICATIONS", Field.FIELD_HCENTER, 0x0078D7);

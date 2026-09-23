@@ -1,6 +1,6 @@
 package com.hamza.blackberrybridge;
 
-import net.rim.device.api.system.Application;
+import net.rim.device.api.ui.UiApplication;
 
 public class MediaManager {
     private SmartBridgeApp app;
@@ -24,7 +24,7 @@ public class MediaManager {
         this.currentState = state;
         
         if (activeScreen != null) {
-            Application.getApplication().invokeLater(new Runnable() {
+            UiApplication.getUiApplication().invokeLater(new Runnable() {
                 public void run() {
                     activeScreen.refreshMedia();
                 }
