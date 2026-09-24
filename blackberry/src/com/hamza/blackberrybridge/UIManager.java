@@ -88,7 +88,7 @@ public class UIManager {
     }
     
     public void openContacts() {
-        pushScreen(new ContactListScreen(app.getContactManager()));
+        pushScreen(new ContactListScreen(app.getContactManager(), app));
     }
     
     public void openMedia() {

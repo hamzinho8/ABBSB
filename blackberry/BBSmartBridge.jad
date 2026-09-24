@@ -1,19 +1,22 @@
 Manifest-Version: 1.0
-MIDlet-Version: 1.1.0
-MIDlet-Jar-Size: 36696
+MIDlet-Version: 1.2.0
+MIDlet-Jar-Size: 43428
 MicroEdition-Configuration: CLDC-1.1
 MIDlet-Jar-URL: BBSmartBridge.jar
-RIM-COD-Module-Dependencies: net_rim_cldc,net_rim_bluetooth
+RIM-COD-Module-Dependencies: net_rim_cldc,net_rim_bluetooth,net_rim_pdap
+RIM-COD-URL-1: BBSmartBridge-1.cod
+RIM-COD-SHA1-1: cb d7 f7 59 36 bd 3b e8 dd d6 eb c9 ca 9d 01 57 7f 96 52 84
 RIM-MIDlet-Flags-1: 0
+RIM-COD-Size-1: 2832
 RIM-COD-Module-Name: BBSmartBridge
-RIM-COD-Size: 57784
+RIM-COD-Size: 62596
 MIDlet-Name: SmartBridge
-RIM-COD-Creation-Time: 1790249622
+RIM-COD-Creation-Time: 1790250796
 RIM-MIDlet-Position-1: 0
 MIDlet-1: SmartBridge,icon.png,com.hamza.blackberrybridge.SmartBridgeApp
 RIM-COD-URL: BBSmartBridge.cod
 MIDlet-Description: Android Bluetooth Companion for BlackBerry
-RIM-COD-SHA1: e9 c9 ec af bb ce b0 db 6d 33 0c 63 cd d0 a2 7b 6b 5d 37 bd
+RIM-COD-SHA1: ae 11 1d 6e b8 38 21 2d 9f 56 3e 25 a2 4c 8b 0e 24 57 48 d9
 MIDlet-Permissions: javax.microedition.io.Connector.bluetooth.client, javax.microedition.io.Connector.bluetooth.server
 MicroEdition-Profile: MIDP-2.0
 MIDlet-Vendor: Hamza

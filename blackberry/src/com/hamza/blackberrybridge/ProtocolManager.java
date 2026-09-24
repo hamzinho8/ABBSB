@@ -63,11 +63,31 @@ public class ProtocolManager {
             else if (command.equals("CALL_MISSED")) {
                 if (parts.length >= 4) app.getCallManager().handleCallMissed(parts[1], parts[2], parts[3]);
             }
+            else if (command.equals("CONTACTS_CLEAR")) {
+                app.getContactManager().clearContacts();
+            }
+            else if (command.equals("CONTACTS_START")) {
+                int count = 10;
+                String type = "VIP";
+                if (parts.length >= 2) {
+                    try { count = Integer.parseInt(parts[1].trim()); } catch (Exception ignored) {}
+                }
+                if (parts.length >= 3) {
+                    type = parts[2];
+                }
+                app.getContactManager().startContactsBatch(count, type);
+            }
             else if (command.equals("CONTACT")) {
-                if (parts.length >= 4) app.getContactManager().handleContact(parts[1], parts[2], parts[3]);
+                if (parts.length >= 4) {
+                    app.getContactManager().handleContact(parts[1], parts[2], parts[3]);
+                } else if (parts.length == 3) {
+                    // Fallback for CONTACT|<nom>|<numero>
+                    app.getContactManager().handleContact("", parts[1], parts[2]);
+                }
             }
             else if (command.equals("CONTACTS_END")) {
-                if (parts.length >= 2) app.getContactManager().handleContactsEnd(parts[1]);
+                String countStr = parts.length >= 2 ? parts[1] : "";
+                app.getContactManager().handleContactsEnd(countStr);
             }
             else if (command.equals("SMS")) {
                 if (parts.length >= 4) {

@@ -1,8 +1,37 @@
 =============================================================================
-GUIDE D'INSTALLATION & DE CONNEXION BLUETOOTH - SmartBridge v1.1.0
+GUIDE D'INSTALLATION & DE CONNEXION BLUETOOTH - SmartBridge v1.2.0
 BlackBerry Curve 9300 / OS 5.0 - OS 6.0 & Android Companion
 =============================================================================
 
+NOUVEAUTÉS VERSION 1.2.0 (SYNCHRONISATION CONTACTS VIP) :
+-----------------------------------------------------------------------------
+1. Gestion des Contacts VIP Restreints (ex: 10 favoris Android) :
+   - Évite d'encombrer la mémoire limitée du BlackBerry Curve 9300.
+   - Réception de la commande 'CONTACTS_CLEAR' : vidage instantané de la mémoire
+     et du RecordStore (RMS) local.
+   - Réception de 'CONTACTS_START|<nombre>|VIP' : initialisation du lot et statut
+     en direct ("Réception de X contacts VIP...").
+   - Réception de 'CONTACT|<id>|<nom>|<numero>' : décodage et ajout dynamique.
+   - Réception de 'CONTACTS_END|<nombre>' : enregistrement dans la base persistante
+     RecordStore (RMS), rafraîchissement d'écran et message modal informatif :
+     Dialog.inform("X contacts VIP synchronisés avec succès !").
+
+2. Persistance Hors Ligne (RecordStore RMS) :
+   - Stockage local dans la mémoire flash du BlackBerry (base "BBSB_VIPContacts").
+   - Vos contacts VIP restent disponibles même lorsque le smartphone est déconnecté
+     ou après redémarrage du Curve 9300.
+
+3. Interface VIP Optimisée Curve 9300 (320x240) :
+   - Étoile dorée ★ et badge [VIP], affichage en 2 lignes (Nom en gras + Numéro).
+   - Recherche rapide en temps réel lors de la frappe dans la barre de recherche.
+   - Appel direct par appui sur la touche d'appel verte ou clic Trackpad.
+   - Menu contextuel :
+     * "Appeler via Android"
+     * "Demander les contacts VIP" (envoie GET_CONTACTS & SYNC_CONTACTS)
+     * "Sauvegarder dans carnet BB" (enregistre directement dans le carnet natif via JSR 75 PIM)
+     * "Vider les contacts VIP"
+
+=============================================================================
 NOUVEAUTÉS VERSION 1.1.0 :
 -----------------------------------------------------------------------------
 1. Amélioration de 'Find My Phone' (Arrêt distant depuis le smartphone) :

@@ -273,6 +273,12 @@ public class SmartBridgeScreen extends MainScreen {
                 app.getConnectionManager().sendData("GET_NETWORK\n");
             }
         });
+        menu.add(new net.rim.device.api.ui.MenuItem("Demander les contacts VIP", 110, 16) {
+            public void run() {
+                app.getContactManager().requestVipContacts();
+                app.getUIManager().openContacts();
+            }
+        });
         menu.add(new net.rim.device.api.ui.MenuItem("Relancer Bluetooth", 110, 20) {
             public void run() {
                 app.getConnectionManager().restartServer();
