@@ -92,6 +92,7 @@ public class SettingsScreen extends MainScreen {
         btnFindPhone.setChangeListener(new FieldChangeListener() {
             public void fieldChanged(Field field, int context) {
                 app.getConnectionManager().sendData("FIND_PHONE\n");
+                app.getUIManager().showSearchingPhonePopup();
             }
         });
         DarkButtonField btnRestartBT = new DarkButtonField("Relancer BT", 130, 40);

@@ -13,6 +13,7 @@ public class SmartBridgeScreen extends MainScreen {
     private DarkLabelField btStatusLabel;
     private DarkLabelField batteryLabel;
     private DarkLabelField weatherLabel;
+    private DarkLabelField networkStatusLabel;
     private DarkButtonField btnNotifs;
     private SmartBridgeApp app;
     private DarkLabelField bbBatteryLabel;
@@ -46,6 +47,12 @@ public class SmartBridgeScreen extends MainScreen {
         statusContainer.add(bbBatteryLabel);
         statusContainer.add(batteryLabel);
         header.add(statusContainer);
+        
+        networkStatusLabel = new DarkLabelField("[Cell] Recherche signal... [....]", Field.FIELD_HCENTER, 0x00D0FF);
+        try {
+            networkStatusLabel.setFont(Font.getDefault().derive(Font.PLAIN, 12));
+        } catch (Throwable e) {}
+        header.add(networkStatusLabel);
         
         boolean isNight = app.getSettingsManager().isNightMode();
         int clockColor = isNight ? 0x666666 : Color.WHITE;
@@ -183,6 +190,40 @@ public class SmartBridgeScreen extends MainScreen {
         } else {
             btStatusLabel.setText("[BT: WAIT] ");
             btStatusLabel.setColor(0xFF0000); 
+            if (networkStatusLabel != null) {
+                networkStatusLabel.setText("[Cell] Deconnecte [....]");
+                networkStatusLabel.setColor(0x777777);
+            }
+        }
+    }
+    
+    public void updateNetworkTelemetry(String operator, String netType, int signalBars, String status) {
+        String bars;
+        if (signalBars >= 4) {
+            bars = "||||";
+        } else if (signalBars == 3) {
+            bars = "|||.";
+        } else if (signalBars == 2) {
+            bars = "||..";
+        } else if (signalBars == 1) {
+            bars = "|...";
+        } else {
+            bars = "....";
+        }
+
+        boolean isOnline = status != null && status.equalsIgnoreCase("ONLINE");
+        String statusLabel = isOnline ? "(En ligne)" : "(Hors ligne)";
+
+        String op = (operator != null && operator.length() > 0) ? operator : "Cell";
+        if (op.length() > 12) {
+            op = op.substring(0, 10) + "..";
+        }
+        String type = (netType != null && netType.length() > 0) ? netType : "4G";
+
+        String text = "[" + type + "] " + op + " - Signal : [" + bars + "] " + statusLabel;
+        if (networkStatusLabel != null) {
+            networkStatusLabel.setText(text);
+            networkStatusLabel.setColor(isOnline ? 0x00E5FF : 0xFFA500);
         }
     }
     
@@ -218,11 +259,18 @@ public class SmartBridgeScreen extends MainScreen {
         menu.add(new net.rim.device.api.ui.MenuItem("Faire sonner l'Android", 110, 10) {
             public void run() {
                 app.getConnectionManager().sendData("FIND_PHONE\n");
+                app.getUIManager().showSearchingPhonePopup();
             }
         });
         menu.add(new net.rim.device.api.ui.MenuItem("Arrêter la sonnerie", 110, 11) {
             public void run() {
                 app.getConnectionManager().sendData("FIND_PHONE_STOP\n");
+                app.getUIManager().hideSearchingPhonePopup();
+            }
+        });
+        menu.add(new net.rim.device.api.ui.MenuItem("Rafraîchir le réseau", 110, 15) {
+            public void run() {
+                app.getConnectionManager().sendData("GET_NETWORK\n");
             }
         });
         menu.add(new net.rim.device.api.ui.MenuItem("Relancer Bluetooth", 110, 20) {

@@ -96,6 +96,34 @@ public class ProtocolManager {
             else if (command.equals("FIND_PHONE_STOP")) {
                 HardwareManager.stopFindPhoneAlert();
                 app.getUIManager().hideFindPhonePopup();
+                app.getUIManager().hideSearchingPhonePopup();
+            }
+            else if (command.equals("PHONE_FOUND") || command.equals("FIND_PHONE_STOPPED")) {
+                app.getUIManager().onPhoneFound();
+            }
+            else if (command.equals("CELL_TELEMETRY") || command.equals("NETWORK_STATUS")) {
+                if (parts.length >= 5) {
+                    String operator = parts[1];
+                    String netType = parts[2];
+                    int signalBars = 0;
+                    try {
+                        signalBars = Integer.parseInt(parts[3]);
+                    } catch (Exception ex) {
+                        signalBars = 0;
+                    }
+                    String status = parts[4];
+                    app.getUIManager().updateNetworkTelemetry(operator, netType, signalBars, status);
+                } else if (parts.length >= 4) {
+                    String operator = parts[1];
+                    String netType = parts[2];
+                    int signalBars = 0;
+                    try {
+                        signalBars = Integer.parseInt(parts[3]);
+                    } catch (Exception ex) {
+                        signalBars = 0;
+                    }
+                    app.getUIManager().updateNetworkTelemetry(operator, netType, signalBars, "ONLINE");
+                }
             }
             else if (command.equals("CLIPBOARD")) {
                 // Clipboard sync disabled due to signature requirement

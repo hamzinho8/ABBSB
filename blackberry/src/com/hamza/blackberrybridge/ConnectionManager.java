@@ -108,6 +108,7 @@ public class ConnectionManager {
         sendData("READY\n");
         sendData("BATTERY|" + BatteryManager.getBatteryLevel() + "\n");
         sendData("GET_PHONE_BATTERY\n");
+        sendData("GET_NETWORK\n");
         sendData("WEATHER\n");
         startWeatherTimer();
     }

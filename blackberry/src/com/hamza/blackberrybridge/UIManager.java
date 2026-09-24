@@ -2,6 +2,7 @@ package com.hamza.blackberrybridge;
 
 import net.rim.device.api.ui.Screen;
 import net.rim.device.api.ui.UiApplication;
+import net.rim.device.api.ui.component.Dialog;
 
 public class UIManager {
     private SmartBridgeScreen mainScreen;
@@ -99,6 +100,46 @@ public class UIManager {
     }
     
     private FindPhonePopup findPhonePopup;
+    private SearchingPhonePopup searchingPhonePopup;
+    
+    public void showSearchingPhonePopup() {
+        UiApplication.getUiApplication().invokeLater(new Runnable() {
+            public void run() {
+                if (searchingPhonePopup == null) {
+                    searchingPhonePopup = new SearchingPhonePopup(app);
+                    UiApplication.getUiApplication().pushScreen(searchingPhonePopup);
+                }
+            }
+        });
+    }
+
+    public void hideSearchingPhonePopup() {
+        UiApplication.getUiApplication().invokeLater(new Runnable() {
+            public void run() {
+                if (searchingPhonePopup != null) {
+                    try { searchingPhonePopup.close(); } catch (Exception e) {}
+                    searchingPhonePopup = null;
+                }
+            }
+        });
+    }
+
+    public void onPhoneFound() {
+        UiApplication.getUiApplication().invokeLater(new Runnable() {
+            public void run() {
+                if (searchingPhonePopup != null) {
+                    try { searchingPhonePopup.close(); } catch (Exception e) {}
+                    searchingPhonePopup = null;
+                }
+                if (findPhonePopup != null) {
+                    try { findPhonePopup.close(); } catch (Exception e) {}
+                    findPhonePopup = null;
+                }
+                HardwareManager.stopFindPhoneAlert();
+                Dialog.inform("Téléphone retrouvé !");
+            }
+        });
+    }
     
     public void showFindPhonePopup() {
         UiApplication.getUiApplication().invokeLater(new Runnable() {
@@ -115,8 +156,18 @@ public class UIManager {
         UiApplication.getUiApplication().invokeLater(new Runnable() {
             public void run() {
                 if (findPhonePopup != null) {
-                    findPhonePopup.close();
+                    try { findPhonePopup.close(); } catch (Exception e) {}
                     findPhonePopup = null;
+                }
+            }
+        });
+    }
+
+    public void updateNetworkTelemetry(final String operator, final String netType, final int signalBars, final String status) {
+        UiApplication.getUiApplication().invokeLater(new Runnable() {
+            public void run() {
+                if (mainScreen != null) {
+                    mainScreen.updateNetworkTelemetry(operator, netType, signalBars, status);
                 }
             }
         });

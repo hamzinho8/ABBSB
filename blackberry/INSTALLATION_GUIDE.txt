@@ -1,8 +1,29 @@
 =============================================================================
-GUIDE D'INSTALLATION & DE CONNEXION BLUETOOTH - SmartBridge v1.0.9
+GUIDE D'INSTALLATION & DE CONNEXION BLUETOOTH - SmartBridge v1.1.0
 BlackBerry Curve 9300 / OS 5.0 - OS 6.0 & Android Companion
 =============================================================================
 
+NOUVEAUTÉS VERSION 1.1.0 :
+-----------------------------------------------------------------------------
+1. Amélioration de 'Find My Phone' (Arrêt distant depuis le smartphone) :
+   - Interception automatique des paquets 'PHONE_FOUND' et 'FIND_PHONE_STOPPED'
+     envoyés par le smartphone Android quand l'utilisateur touche "Arrêter l'alarme".
+   - Fermeture instantanée de la popup de recherche sur le BlackBerry.
+   - Arrêt des vibrations / avertisseurs sonores.
+   - Affichage d'une boîte de dialogue modale : Dialog.inform("Téléphone retrouvé !").
+
+2. Module de Télémesure Réseau & Signal du smartphone (CELL_TELEMETRY) :
+   - Réception et décodage en temps réel des paquets envoyés par Android :
+     CELL_TELEMETRY|Operateur|TypeReseau|SignalBars|StatutInternet
+     (ou NETWORK_STATUS|...)
+   - Affichage direct sur l'écran d'accueil du BlackBerry (Curve 9300, 320x240) :
+     Exemple : [5G] Orange F - Signal : [||||] (En ligne)
+     Si le signal vaut 3 : [|||.] / 2 : [||..] / 1 : [|...] / 0 : [....]
+   - Code couleur dynamique : Cyan vif en ligne (ONLINE), Orange hors-ligne (OFFLINE).
+   - Option de Menu "Rafraîchir le réseau" : envoie la commande GET_NETWORK via Bluetooth
+     pour obtenir instantanément l'état réseau le plus récent du smartphone.
+
+=============================================================================
 1. EXPLICATION DE L'ANOMALIE BLUETOOTH (LED BLEUE CLIGNOTANTE) :
 -----------------------------------------------------------------------------
 Sur votre BlackBerry Curve 9300, l'application s'ouvrait correctement avec la 
