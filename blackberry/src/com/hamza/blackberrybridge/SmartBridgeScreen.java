@@ -278,6 +278,22 @@ public class SmartBridgeScreen extends MainScreen {
                 app.getConnectionManager().sendData("GET_NETWORK\n");
             }
         });
+        menu.add(new net.rim.device.api.ui.MenuItem("Guide Audio Mains-Libres (HFP)", 110, 18) {
+            public void run() {
+                net.rim.device.api.ui.component.Dialog.inform(
+                    "--- GUIDE AUDIO MAINS-LIBRES ---\n\n" +
+                    "1. Sur BlackBerry :\n" +
+                    "   Options > Bluetooth > Menu > Options Bluetooth.\n" +
+                    "   Vérifier que 'Passerelle audio mains libres' est activée.\n\n" +
+                    "2. Sur Android :\n" +
+                    "   Paramètres > Bluetooth > Appareils associés > Votre BlackBerry.\n" +
+                    "   Cocher 'Appels audio' (Profil Mains-Libres / HFP).\n\n" +
+                    "3. Pendant un appel :\n" +
+                    "   Le son et le micro transitent par le BlackBerry via SCO/Bluetooth !\n" +
+                    "   Utilisez la touche Menu pour basculer vers le haut-parleur."
+                );
+            }
+        });
         menu.add(new net.rim.device.api.ui.MenuItem("Demander les contacts VIP", 110, 16) {
             public void run() {
                 app.getContactManager().requestVipContacts();

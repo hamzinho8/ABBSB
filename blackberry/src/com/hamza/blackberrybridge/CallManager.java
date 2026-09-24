@@ -18,11 +18,13 @@ public class CallManager {
     private String activeCallId;
     private boolean callInProgress = false;
     private boolean speakerOn = false;
+    private String currentAudioRoute = "BLUETOOTH";
     
     public CallManager(UIManager uiManager, SmartBridgeApp app) {
         this.uiManager = uiManager;
         this.app = app;
         this.simCards = new Vector();
+        this.currentAudioRoute = "BLUETOOTH";
     }
     
     // =========================================================================
@@ -185,15 +187,21 @@ public class CallManager {
     // =========================================================================
     
     public void handleCallActive(final String id) {
+        handleCallActive(id, null);
+    }
+    
+    public void handleCallActive(final String id, final String simName) {
         activeCallId = id;
         callInProgress = true;
         HardwareManager.stopAlerts();
         app.getAudioManager().stopCallRingtone();
+        app.getAudioManager().playCallConnectBeep();
         
         UiApplication.getUiApplication().invokeLater(new Runnable() {
             public void run() {
                 if (activeCallScreen != null) {
-                    activeCallScreen.setCallActive();
+                    activeCallScreen.setCallActive(simName);
+                    activeCallScreen.updateAudioRoute(currentAudioRoute);
                 }
             }
         });
@@ -205,11 +213,12 @@ public class CallManager {
         speakerOn = false;
         HardwareManager.stopAlerts();
         app.getAudioManager().stopCallRingtone();
+        app.getAudioManager().playCallEndBeep();
         
         UiApplication.getUiApplication().invokeLater(new Runnable() {
             public void run() {
                 if (activeCallScreen != null) {
-                    try { activeCallScreen.close(); } catch (Exception ignored) {}
+                    activeCallScreen.setCallEnded();
                     activeCallScreen = null;
                 }
             }
@@ -236,12 +245,13 @@ public class CallManager {
     }
     
     // =========================================================================
-    // Actions utilisateur (Décrocher, Refuser, Raccrocher, Haut-Parleur)
+    // Actions utilisateur (Décrocher, Refuser, Raccrocher, Haut-Parleur, Audio Routing)
     // =========================================================================
     
     public void answerCall(final String id) {
         app.getAudioManager().stopCallRingtone();
         HardwareManager.stopAlerts();
+        app.getAudioManager().playCallConnectBeep();
         
         new Thread(new Runnable() {
             public void run() {
@@ -275,6 +285,7 @@ public class CallManager {
     public void endCurrentCall() {
         app.getAudioManager().stopCallRingtone();
         HardwareManager.stopAlerts();
+        app.getAudioManager().playCallEndBeep();
         callInProgress = false;
         activeCallId = null;
         speakerOn = false;
@@ -286,7 +297,7 @@ public class CallManager {
         }).start();
         
         if (activeCallScreen != null) {
-            try { activeCallScreen.close(); } catch (Exception ignored) {}
+            activeCallScreen.setCallEnded();
             activeCallScreen = null;
         }
     }
@@ -313,11 +324,80 @@ public class CallManager {
         });
     }
     
+    // =========================================================================
+    // Routage Audio Téléphonie Bluetooth & Local
+    // =========================================================================
+    
+    /**
+     * Envoie la commande de sélection de route audio au smartphone Android :
+     * - AUDIO_ROUTE|BLUETOOTH    -> Audio Bluetooth / BlackBerry
+     * - AUDIO_ROUTE|SPEAKERPHONE -> Haut-parleur Smartphone
+     * - AUDIO_ROUTE|EARPIECE     -> Écouteur Smartphone
+     */
+    public void setAudioRoute(final String route) {
+        if (route == null) return;
+        this.currentAudioRoute = route.toUpperCase();
+        LogManager.log("CALL", "Setting audio route: " + currentAudioRoute);
+        
+        new Thread(new Runnable() {
+            public void run() {
+                app.getConnectionManager().sendData("AUDIO_ROUTE|" + currentAudioRoute + "\n");
+            }
+        }).start();
+        
+        if ("BLUETOOTH".equalsIgnoreCase(currentAudioRoute)) {
+            // S'assurer que le routage audio local RIM est enclenché
+            app.getAudioManager().setLocalAudioPath(net.rim.device.api.media.control.AudioPathControl.AUDIO_PATH_HANDSET);
+        }
+        
+        UiApplication.getUiApplication().invokeLater(new Runnable() {
+            public void run() {
+                if (activeCallScreen != null) {
+                    activeCallScreen.updateAudioRoute(currentAudioRoute);
+                }
+            }
+        });
+    }
+    
+    /**
+     * Confirmation de route audio reçue d'Android : AUDIO_STATUS|<ROUTE>
+     */
+    public void handleAudioStatus(final String route) {
+        this.currentAudioRoute = (route != null) ? route.toUpperCase() : "BLUETOOTH";
+        LogManager.log("CALL", "AUDIO_STATUS updated from Android: " + currentAudioRoute);
+        
+        UiApplication.getUiApplication().invokeLater(new Runnable() {
+            public void run() {
+                if (activeCallScreen != null) {
+                    activeCallScreen.updateAudioRoute(currentAudioRoute);
+                }
+            }
+        });
+    }
+    
+    /**
+     * Bascule la sortie locale BlackBerry entre le combiné (écouteur) et le haut-parleur physique.
+     */
+    public void toggleLocalAudio() {
+        boolean isSpeaker = app.getAudioManager().toggleLocalAudioPath();
+        if (activeCallScreen != null) {
+            activeCallScreen.updateLocalAudioBadge(isSpeaker);
+        }
+    }
+    
+    public String getCurrentAudioRoute() {
+        return currentAudioRoute;
+    }
+
     public boolean isSpeakerOn() {
         return speakerOn;
     }
     
     public boolean isCallInProgress() {
         return callInProgress;
+    }
+    
+    public SmartBridgeApp getApp() {
+        return app;
     }
 }

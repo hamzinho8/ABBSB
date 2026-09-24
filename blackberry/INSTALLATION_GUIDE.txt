@@ -1,9 +1,42 @@
 =============================================================================
-GUIDE D'INSTALLATION & DE CONNEXION BLUETOOTH - SmartBridge v1.3.0
+GUIDE D'INSTALLATION & DE CONNEXION BLUETOOTH - SmartBridge v1.4.0
 BlackBerry Curve 9300 / OS 5.0 - OS 6.0 & Android Companion
 =============================================================================
 
-NOUVEAUTÉS VERSION 1.3.0 (TÉLÉPHONIE DOUBLE SIM & ROUTAGE AUDIO) :
+NOUVEAUTÉS VERSION 1.4.0 (AUDIO MAINS-LIBRES HFP, MICRO/ÉCOUTEUR & ROUTAGE) :
+-----------------------------------------------------------------------------
+1. Profil Bluetooth Mains-Libres (HFP / Headset - SDP 0x111E & 0x1108) :
+   - Enregistrement automatique de l'enregistrement de service SDP (Service Record)
+     dans la pile Bluetooth JSR-82 de BlackBerry OS 5.0.
+   - Le smartphone Android reconnaît désormais le BlackBerry Curve comme un véritable
+     accessoire audio mains-libres Bluetooth (Handsfree Unit) et non plus seulement SPP.
+   - Prise en charge des commandes AT de négociation HFP (AT+BRSF, AT+CIND, AT+CMER, AT+VGS/VGM).
+   - Le canal vocal SCO est synchronisé : l'utilisateur peut PARLER dans le micro du BlackBerry
+     et ÉCOUTER directement dans l'écouteur ou haut-parleur du BlackBerry.
+
+2. Écran d'Appel en Cours (« In-Call Screen ») Amélioré :
+   - Affichage en grand du nom, numéro et SIM utilisée (ex: "Appel via [inwi]").
+   - Statut temps réel : "Numérotation...", "Sonnerie...", "En communication (01:23)", "Appel terminé".
+   - Chronomètre de communication (00:00) démarrant dès la réception de CALL_ACTIVE.
+   - Bip sonore de connexion et bip court de fin d'appel (Alert.startAudio).
+   - Fermeture automatique élégante après 1.4s à la réception de CALL_END.
+
+3. Routage Audio Complet (Smartphone vs BlackBerry) :
+   - Bouton & dialogue de sélection rapide de la route audio :
+     * "Audio Bluetooth / BlackBerry" -> envoie AUDIO_ROUTE|BLUETOOTH
+     * "Haut-parleur Smartphone"     -> envoie AUDIO_ROUTE|SPEAKERPHONE
+     * "Écouteur Smartphone"         -> envoie AUDIO_ROUTE|EARPIECE
+     * "Bascule Audio Local (HP/Combiné)" -> exploite AudioPathControl sur le BlackBerry !
+   - Interception du paquet de statut Android : AUDIO_STATUS|<ROUTE> (ex: AUDIO_STATUS|BLUETOOTH).
+   - Badge d'état dynamique : [Audio: Bluetooth / BlackBerry] / [HP Tel: ON/OFF].
+
+4. Activation dans les Options BlackBerry :
+   - Options > Bluetooth > Menu > Options Bluetooth :
+     Vérifier que "Passerelle audio mains libres" ou "Casque" est cochée.
+   - Sur Android : Paramètres Bluetooth > BlackBerry > Activer "Appels audio".
+
+=============================================================================
+NOUVEAUTÉS VERSION 1.3.0 (TÉLÉPHONIE DOUBLE SIM & SÉLECTEUR) :
 -----------------------------------------------------------------------------
 1. Appels sortants avec Sélecteur de SIM :
    - Détection automatique du nombre de cartes SIM sur l'Android (SIM_LIST).

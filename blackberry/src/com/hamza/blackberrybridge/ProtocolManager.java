@@ -82,7 +82,8 @@ public class ProtocolManager {
             }
             else if (command.equals("CALL_ACTIVE")) {
                 String id = (parts.length >= 2) ? parts[1] : "";
-                app.getCallManager().handleCallActive(id);
+                String sim = (parts.length >= 3) ? parts[2] : null;
+                app.getCallManager().handleCallActive(id, sim);
             }
             else if (command.equals("CALL_END")) {
                 String id = (parts.length >= 2) ? parts[1] : "";
@@ -94,6 +95,10 @@ public class ProtocolManager {
             else if (command.equals("SPEAKER_STATUS")) {
                 String status = (parts.length >= 2) ? parts[1] : "OFF";
                 app.getCallManager().handleSpeakerStatus(status);
+            }
+            else if (command.equals("AUDIO_STATUS") || command.equals("AUDIO_ROUTE")) {
+                String route = (parts.length >= 2) ? parts[1] : "BLUETOOTH";
+                app.getCallManager().handleAudioStatus(route);
             }
             else if (command.equals("CONTACTS_CLEAR")) {
                 app.getContactManager().clearContacts();

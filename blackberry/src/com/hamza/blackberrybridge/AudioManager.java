@@ -3,6 +3,9 @@ package com.hamza.blackberrybridge;
 import javax.microedition.media.Manager;
 import javax.microedition.media.Player;
 import javax.microedition.media.control.VolumeControl;
+import net.rim.device.api.media.control.AudioPathControl;
+import net.rim.device.api.system.Alert;
+import net.rim.device.api.system.Audio;
 import java.io.InputStream;
 
 public class AudioManager {
@@ -10,6 +13,10 @@ public class AudioManager {
     private Player callPlayer;
     private Player notifPlayer;
     private long lastNotifTime = 0;
+    
+    // Local BlackBerry audio output routing
+    private boolean localSpeakerOn = false;
+    private int currentLocalAudioPath = AudioPathControl.AUDIO_PATH_HANDSET;
 
     public AudioManager(SmartBridgeApp app) {
         this.app = app;
@@ -54,6 +61,72 @@ public class AudioManager {
                 callPlayer = null;
             }
         } catch (Throwable e) {}
+    }
+
+    /**
+     * Bip sonore court émis à la fin de l'appel (style natif BlackBerry).
+     */
+    public void playCallEndBeep() {
+        try {
+            if (Alert.isAudioSupported()) {
+                // Séquence [Fréquence Hz, Durée ms, Fréquence 2, Durée 2...]
+                short[] endBeep = new short[] { 900, 120, 0, 40, 700, 180 };
+                Alert.startAudio(endBeep, 80);
+            }
+        } catch (Throwable t) {
+            LogManager.error("AUDIO", "Call end beep error: " + t.getMessage());
+        }
+    }
+
+    /**
+     * Bip sonore doux émis lors de la mise en communication de l'appel.
+     */
+    public void playCallConnectBeep() {
+        try {
+            if (Alert.isAudioSupported()) {
+                short[] connectBeep = new short[] { 700, 80, 0, 30, 950, 100 };
+                Alert.startAudio(connectBeep, 75);
+            }
+        } catch (Throwable t) {
+            LogManager.error("AUDIO", "Call connect beep error: " + t.getMessage());
+        }
+    }
+
+    /**
+     * Configuration du routage audio local sur le haut-parleur ou l'écouteur du BlackBerry.
+     * Utilise net.rim.device.api.media.control.AudioPathControl.
+     */
+    public synchronized boolean setLocalAudioPath(int path) {
+        this.currentLocalAudioPath = path;
+        this.localSpeakerOn = (path == AudioPathControl.AUDIO_PATH_HANDSFREE);
+        LogManager.log("AUDIO", "Local audio path set to: " + (localSpeakerOn ? "HANDSFREE (HP)" : "HANDSET (Combiné)"));
+        
+        try {
+            if (callPlayer != null) {
+                AudioPathControl apc = (AudioPathControl) callPlayer.getControl("net.rim.device.api.media.control.AudioPathControl");
+                if (apc != null && apc.canSwitchToPath(path)) {
+                    apc.setAudioPath(path);
+                    return true;
+                }
+            }
+        } catch (Throwable t) {
+            LogManager.error("AUDIO", "AudioPathControl error: " + t.getMessage());
+        }
+        return false;
+    }
+
+    public synchronized boolean toggleLocalAudioPath() {
+        int targetPath = localSpeakerOn ? AudioPathControl.AUDIO_PATH_HANDSET : AudioPathControl.AUDIO_PATH_HANDSFREE;
+        setLocalAudioPath(targetPath);
+        return localSpeakerOn;
+    }
+
+    public boolean isLocalSpeakerOn() {
+        return localSpeakerOn;
+    }
+
+    public int getLocalAudioPath() {
+        return currentLocalAudioPath;
     }
 
     public void playNotificationSound(String appName) {

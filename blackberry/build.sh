@@ -60,8 +60,8 @@ cat << 'EOF' > BBSmartBridge.alx
 <loader version="1.0">
     <application id="BBSmartBridge">
         <name>SmartBridge</name>
-        <description>Android Bluetooth Companion for BlackBerry Curve 9300</description>
-        <version>1.2.0</version>
+        <description>Android Bluetooth Companion for BlackBerry Curve 9300 with HFP Audio Routing</description>
+        <version>1.4.0</version>
         <vendor>Hamza</vendor>
         <copyright>Copyright (c) 2024 Hamza</copyright>
         <fileset Java="1.54" _blackberryVersion="[5.0.0)">
