@@ -1,59 +1,323 @@
 package com.hamza.blackberrybridge;
 
+import java.util.Vector;
+import net.rim.device.api.ui.UiApplication;
+import net.rim.device.api.ui.component.Dialog;
+
+/**
+ * Gestionnaire de téléphonie pour BlackBerry Bridge.
+ * Prise en charge des appels entrants, sortants, Double SIM et routage audio (Haut-parleur).
+ */
 public class CallManager {
     private UIManager uiManager;
     private SmartBridgeApp app;
     private CallScreen activeCallScreen;
     
+    // Liste des cartes SIM du smartphone Android distant
+    private Vector simCards;
+    private String activeCallId;
+    private boolean callInProgress = false;
+    private boolean speakerOn = false;
+    
     public CallManager(UIManager uiManager, SmartBridgeApp app) {
         this.uiManager = uiManager;
         this.app = app;
+        this.simCards = new Vector();
     }
     
-    public void handleIncomingCall(String id, String name, String number) {
-        HardwareManager.triggerCallAlert(app);
-        
-        activeCallScreen = new CallScreen(this, id, name, number);
-        uiManager.pushScreen(activeCallScreen);
-    }
+    // =========================================================================
+    // Gestion Double SIM (SIM_LIST)
+    // =========================================================================
     
-    public void handleCallActive(String id) {
-        HardwareManager.stopAlerts();
-        app.getAudioManager().stopCallRingtone();
-        if (activeCallScreen != null) {
-            activeCallScreen.setStatus("Active");
+    public synchronized void setSimList(Vector newSims) {
+        this.simCards.removeAllElements();
+        if (newSims != null) {
+            for (int i = 0; i < newSims.size(); i++) {
+                this.simCards.addElement(newSims.elementAt(i));
+            }
         }
+        LogManager.log("CALL", "SIM list updated: " + simCards.size() + " SIM(s) available");
     }
     
-    public void handleCallEnd(String id) {
-        HardwareManager.stopAlerts();
-        app.getAudioManager().stopCallRingtone();
+    public synchronized Vector getSimCards() {
+        return simCards;
+    }
+    
+    public synchronized boolean isDualSim() {
+        return simCards != null && simCards.size() >= 2;
+    }
+    
+    public synchronized SimCard getSim(int index) {
+        if (simCards != null && index >= 0 && index < simCards.size()) {
+            return (SimCard) simCards.elementAt(index);
+        }
+        return null;
+    }
+    
+    // =========================================================================
+    // Appels sortants (Outbound Calls avec choix SIM)
+    // =========================================================================
+    
+    /**
+     * Déclenche un appel sortant en vérifiant le nombre de SIMs disponibles.
+     * Si 2 cartes SIM sont disponibles, affiche un dialogue de sélection.
+     */
+    public void initiateOutboundCall(final String number, final String contactName) {
+        if (number == null || number.trim().length() == 0) {
+            UiApplication.getUiApplication().invokeLater(new Runnable() {
+                public void run() {
+                    Dialog.alert("Numéro de téléphone invalide.");
+                }
+            });
+            return;
+        }
+        
+        final String cleanNumber = number.trim();
+        final String displayName = (contactName != null && contactName.trim().length() > 0) ? contactName.trim() : cleanNumber;
+        
+        // Exécuté sur le thread UI pour afficher la boîte de dialogue si nécessaire
+        UiApplication.getUiApplication().invokeLater(new Runnable() {
+            public void run() {
+                if (simCards != null && simCards.size() >= 2) {
+                    SimCard sim1 = (SimCard) simCards.elementAt(0);
+                    SimCard sim2 = (SimCard) simCards.elementAt(1);
+                    
+                    String prompt = "Appeler " + displayName + " avec :";
+                    Object[] choices = new Object[] {
+                        "1: " + sim1.getName(),
+                        "2: " + sim2.getName(),
+                        "Annuler"
+                    };
+                    
+                    int choice = Dialog.ask(prompt, choices, 0);
+                    if (choice == 0) {
+                        sendOutboundCallPacket(cleanNumber, sim1.getSlot(), sim1.getName(), displayName);
+                    } else if (choice == 1) {
+                        sendOutboundCallPacket(cleanNumber, sim2.getSlot(), sim2.getName(), displayName);
+                    }
+                    // Annuler ou touche Retour : ne rien envoyer
+                } else if (simCards != null && simCards.size() == 1) {
+                    SimCard singleSim = (SimCard) simCards.elementAt(0);
+                    sendOutboundCallPacket(cleanNumber, singleSim.getSlot(), singleSim.getName(), displayName);
+                } else {
+                    // Aucune info SIM reçue : envoyer simplement CALL_OUTBOUND|<numero>
+                    sendOutboundCallPacket(cleanNumber, -1, null, displayName);
+                }
+            }
+        });
+    }
+    
+    private void sendOutboundCallPacket(final String number, final int slot, final String simName, final String displayName) {
+        callInProgress = true;
+        speakerOn = false;
+        
+        // Ouvrir l'écran d'appel sortant sur le BlackBerry
         if (activeCallScreen != null) {
-            activeCallScreen.close();
+            try { activeCallScreen.close(); } catch (Exception ignored) {}
             activeCallScreen = null;
         }
+        activeCallScreen = new CallScreen(this, "outbound_" + System.currentTimeMillis(), displayName, number, simName != null ? simName : "", true);
+        uiManager.pushScreen(activeCallScreen);
+        
+        // Envoi réseau sur un thread en arrière-plan
+        new Thread(new Runnable() {
+            public void run() {
+                String packet;
+                if (slot >= 0) {
+                    packet = "CALL_OUTBOUND|" + number + "|" + slot + "\n";
+                } else {
+                    packet = "CALL_OUTBOUND|" + number + "\n";
+                }
+                LogManager.log("CALL", "Sending outbound call: " + packet.trim());
+                app.getConnectionManager().sendData(packet);
+            }
+        }).start();
+    }
+    
+    /**
+     * Confirmation de lancement d'appel reçue de l'Android:
+     * CALL_OUTBOUND_OK|<numero>|<nom_sim>|<slot>
+     */
+    public void handleCallOutboundOk(final String number, final String simName, final String slot) {
+        LogManager.log("CALL", "CALL_OUTBOUND_OK: " + number + " on " + simName + " (slot " + slot + ")");
+        UiApplication.getUiApplication().invokeLater(new Runnable() {
+            public void run() {
+                String simDisplay = (simName != null && simName.trim().length() > 0) ? simName.trim() : ("SIM " + slot);
+                String msg = "Appel en cours sur " + simDisplay + "...";
+                if (activeCallScreen != null) {
+                    activeCallScreen.setStatus(msg);
+                    activeCallScreen.setSimName(simDisplay);
+                }
+                Dialog.inform(msg);
+            }
+        });
+    }
+    
+    // =========================================================================
+    // Gestion des appels entrants (CALL_INCOMING)
+    // =========================================================================
+    
+    public void handleIncomingCall(String id, String name, String number) {
+        handleIncomingCall(id, name, number, "");
+    }
+    
+    public void handleIncomingCall(final String id, final String name, final String number, final String simName) {
+        activeCallId = id;
+        callInProgress = true;
+        speakerOn = false;
+        
+        HardwareManager.triggerCallAlert(app);
+        
+        UiApplication.getUiApplication().invokeLater(new Runnable() {
+            public void run() {
+                if (activeCallScreen != null) {
+                    try { activeCallScreen.close(); } catch (Exception ignored) {}
+                    activeCallScreen = null;
+                }
+                activeCallScreen = new CallScreen(CallManager.this, id, name, number, simName, false);
+                uiManager.pushScreen(activeCallScreen);
+            }
+        });
+    }
+    
+    // =========================================================================
+    // Statuts d'appel (CALL_ACTIVE, CALL_END, CALL_MISSED)
+    // =========================================================================
+    
+    public void handleCallActive(final String id) {
+        activeCallId = id;
+        callInProgress = true;
+        HardwareManager.stopAlerts();
+        app.getAudioManager().stopCallRingtone();
+        
+        UiApplication.getUiApplication().invokeLater(new Runnable() {
+            public void run() {
+                if (activeCallScreen != null) {
+                    activeCallScreen.setCallActive();
+                }
+            }
+        });
+    }
+    
+    public void handleCallEnd(final String id) {
+        callInProgress = false;
+        activeCallId = null;
+        speakerOn = false;
+        HardwareManager.stopAlerts();
+        app.getAudioManager().stopCallRingtone();
+        
+        UiApplication.getUiApplication().invokeLater(new Runnable() {
+            public void run() {
+                if (activeCallScreen != null) {
+                    try { activeCallScreen.close(); } catch (Exception ignored) {}
+                    activeCallScreen = null;
+                }
+            }
+        });
     }
     
     public void handleCallMissed(String id, String name, String number) {
+        callInProgress = false;
+        activeCallId = null;
+        speakerOn = false;
         HardwareManager.stopAlerts();
         app.getAudioManager().stopCallRingtone();
+        
+        UiApplication.getUiApplication().invokeLater(new Runnable() {
+            public void run() {
+                if (activeCallScreen != null) {
+                    try { activeCallScreen.close(); } catch (Exception ignored) {}
+                    activeCallScreen = null;
+                }
+            }
+        });
+        
+        app.getNotificationManager().handleNotification("missed_" + id, "Téléphone", name, "Appel manqué de " + number);
+    }
+    
+    // =========================================================================
+    // Actions utilisateur (Décrocher, Refuser, Raccrocher, Haut-Parleur)
+    // =========================================================================
+    
+    public void answerCall(final String id) {
+        app.getAudioManager().stopCallRingtone();
+        HardwareManager.stopAlerts();
+        
+        new Thread(new Runnable() {
+            public void run() {
+                app.getConnectionManager().sendData("CALL_ANSWER|" + id + "\n");
+            }
+        }).start();
+        
         if (activeCallScreen != null) {
-            activeCallScreen.close();
+            activeCallScreen.setCallActive();
+        }
+    }
+    
+    public void rejectCall(final String id) {
+        app.getAudioManager().stopCallRingtone();
+        HardwareManager.stopAlerts();
+        callInProgress = false;
+        activeCallId = null;
+        
+        new Thread(new Runnable() {
+            public void run() {
+                app.getConnectionManager().sendData("CALL_REJECT|" + id + "\n");
+            }
+        }).start();
+        
+        if (activeCallScreen != null) {
+            try { activeCallScreen.close(); } catch (Exception ignored) {}
             activeCallScreen = null;
         }
+    }
+    
+    public void endCurrentCall() {
+        app.getAudioManager().stopCallRingtone();
+        HardwareManager.stopAlerts();
+        callInProgress = false;
+        activeCallId = null;
+        speakerOn = false;
         
-        app.getNotificationManager().handleNotification("missed_" + id, "Phone", name, "Missed call from " + number);
+        new Thread(new Runnable() {
+            public void run() {
+                app.getConnectionManager().sendData("CALL_END\n");
+            }
+        }).start();
+        
+        if (activeCallScreen != null) {
+            try { activeCallScreen.close(); } catch (Exception ignored) {}
+            activeCallScreen = null;
+        }
     }
     
-    public void answerCall(String id) {
-        app.getAudioManager().stopCallRingtone();
-        HardwareManager.stopAlerts();
-        app.getConnectionManager().sendData("CALL_ANSWER|" + id + "\n");
+    public void toggleSpeaker() {
+        new Thread(new Runnable() {
+            public void run() {
+                LogManager.log("CALL", "Sending SPEAKER_TOGGLE");
+                app.getConnectionManager().sendData("SPEAKER_TOGGLE\n");
+            }
+        }).start();
     }
     
-    public void rejectCall(String id) {
-        app.getAudioManager().stopCallRingtone();
-        HardwareManager.stopAlerts();
-        app.getConnectionManager().sendData("CALL_REJECT|" + id + "\n");
+    public void handleSpeakerStatus(final String status) {
+        this.speakerOn = "ON".equalsIgnoreCase(status);
+        LogManager.log("CALL", "Speaker status updated: " + status + " (" + speakerOn + ")");
+        
+        UiApplication.getUiApplication().invokeLater(new Runnable() {
+            public void run() {
+                if (activeCallScreen != null) {
+                    activeCallScreen.updateSpeakerStatus(speakerOn);
+                }
+            }
+        });
+    }
+    
+    public boolean isSpeakerOn() {
+        return speakerOn;
+    }
+    
+    public boolean isCallInProgress() {
+        return callInProgress;
     }
 }

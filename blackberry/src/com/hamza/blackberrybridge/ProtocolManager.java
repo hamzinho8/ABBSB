@@ -47,21 +47,53 @@ public class ProtocolManager {
                     connectionManager.sendData("ERROR|INVALID_PACKET\n");
                 }
             }
+            else if (command.equals("SIM_LIST")) {
+                int count = 0;
+                if (parts.length >= 2) {
+                    try { count = Integer.parseInt(parts[1].trim()); } catch (Exception ignored) {}
+                }
+                Vector sims = new Vector();
+                int idx = 2;
+                for (int i = 0; i < count && idx < parts.length; i++) {
+                    String simName = parts[idx];
+                    int slot = i;
+                    if (idx + 1 < parts.length) {
+                        try { slot = Integer.parseInt(parts[idx + 1].trim()); } catch (Exception ignored) {}
+                    }
+                    sims.addElement(new SimCard(simName, slot));
+                    idx += 2;
+                }
+                app.getCallManager().setSimList(sims);
+            }
+            else if (command.equals("CALL_OUTBOUND_OK")) {
+                String num = parts.length >= 2 ? parts[1] : "";
+                String sim = parts.length >= 3 ? parts[2] : "";
+                String slot = parts.length >= 4 ? parts[3] : "";
+                app.getCallManager().handleCallOutboundOk(num, sim, slot);
+            }
             else if (command.equals("CALL_INCOMING")) {
-                if (parts.length >= 4) {
-                    app.getCallManager().handleIncomingCall(parts[1], parts[2], parts[3]);
+                if (parts.length >= 5) {
+                    app.getCallManager().handleIncomingCall(parts[1], parts[2], parts[3], parts[4]);
+                } else if (parts.length >= 4) {
+                    app.getCallManager().handleIncomingCall(parts[1], parts[2], parts[3], "");
                 } else {
                     connectionManager.sendData("ERROR|INVALID_PACKET\n");
                 }
             }
             else if (command.equals("CALL_ACTIVE")) {
-                if (parts.length >= 2) app.getCallManager().handleCallActive(parts[1]);
+                String id = (parts.length >= 2) ? parts[1] : "";
+                app.getCallManager().handleCallActive(id);
             }
             else if (command.equals("CALL_END")) {
-                if (parts.length >= 2) app.getCallManager().handleCallEnd(parts[1]);
+                String id = (parts.length >= 2) ? parts[1] : "";
+                app.getCallManager().handleCallEnd(id);
             }
             else if (command.equals("CALL_MISSED")) {
                 if (parts.length >= 4) app.getCallManager().handleCallMissed(parts[1], parts[2], parts[3]);
+            }
+            else if (command.equals("SPEAKER_STATUS")) {
+                String status = (parts.length >= 2) ? parts[1] : "OFF";
+                app.getCallManager().handleSpeakerStatus(status);
             }
             else if (command.equals("CONTACTS_CLEAR")) {
                 app.getContactManager().clearContacts();

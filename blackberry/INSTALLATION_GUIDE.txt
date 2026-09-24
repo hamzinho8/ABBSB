@@ -1,8 +1,47 @@
 =============================================================================
-GUIDE D'INSTALLATION & DE CONNEXION BLUETOOTH - SmartBridge v1.2.0
+GUIDE D'INSTALLATION & DE CONNEXION BLUETOOTH - SmartBridge v1.3.0
 BlackBerry Curve 9300 / OS 5.0 - OS 6.0 & Android Companion
 =============================================================================
 
+NOUVEAUTÉS VERSION 1.3.0 (TÉLÉPHONIE DOUBLE SIM & ROUTAGE AUDIO) :
+-----------------------------------------------------------------------------
+1. Appels sortants avec Sélecteur de SIM :
+   - Détection automatique du nombre de cartes SIM sur l'Android (SIM_LIST).
+   - Si 2 cartes SIM sont disponibles (ex: inwi et Orange) :
+     Affichage d'une boîte de dialogue modale au lancement d'un appel (Dialer ou Contacts) :
+     "Appeler [Nom] avec :"
+     Option 1 : [inwi]
+     Option 2 : [Orange]
+   - Envoi de la trame RFCOMM : CALL_OUTBOUND|<numero>|<slot_sim>
+     (ex: CALL_OUTBOUND|+212634934134|0 pour SIM 1, ou |1 pour SIM 2).
+   - Réception de la confirmation Android : CALL_OUTBOUND_OK|<numero>|<nom_sim>|<slot>
+     Affichage à l'écran de : "Appel en cours sur [nom_sim]..."
+
+2. Handshake SIM au démarrage :
+   - Réception de : SIM_LIST|<nombre_sim>|<sim0_name>|<sim0_slot>|<sim1_name>|<sim1_slot>...
+     Exemple : SIM_LIST|2|inwi|0|Orange|1
+   - Sauvegarde en mémoire vive dans CallManager pour alimenter les dialogues d'appel.
+
+3. Appels entrants avec Affichage de la SIM :
+   - Réception de : CALL_INCOMING|<callId>|<callerName>|<incomingNumber>|<simName>
+   - Vibreur matériel Curve 9300 et sonnerie d'appel continue.
+   - Popup modale plein écran avec :
+     * "Appel entrant sur [" + simName + "]"
+     * Nom du contact et numéro en grand format
+     * Bouton vert / Touche physique verte (Send) : Décrocher -> envoie CALL_ANSWER|<callId>
+     * Bouton rouge / Touche physique rouge / Échap : Refuser -> envoie CALL_REJECT|<callId>
+
+4. Statut d'appel et Fin de communication :
+   - Réception de CALL_ACTIVE|<callId> : passage en mode communication ("COMMUNICATION ACTIVE").
+   - Réception de CALL_END|<callId> : arrêt immédiat de la sonnerie et fermeture de l'écran.
+   - Raccrocher depuis le BlackBerry pendant un appel : envoie CALL_END.
+
+5. Bouton Haut-Parleur & Routage Audio :
+   - Pendant un appel (sortant ou entrant), option de menu et bouton "Haut-parleur ON/OFF".
+   - Envoie la commande Bluetooth : SPEAKER_TOGGLE
+   - Réception de l'état : SPEAKER_STATUS|ON ou SPEAKER_STATUS|OFF avec mise à jour du statut.
+
+=============================================================================
 NOUVEAUTÉS VERSION 1.2.0 (SYNCHRONISATION CONTACTS VIP) :
 -----------------------------------------------------------------------------
 1. Gestion des Contacts VIP Restreints (ex: 10 favoris Android) :

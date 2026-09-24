@@ -268,6 +268,11 @@ public class SmartBridgeScreen extends MainScreen {
                 app.getUIManager().hideSearchingPhonePopup();
             }
         });
+        menu.add(new net.rim.device.api.ui.MenuItem("Rafraîchir les cartes SIM", 110, 14) {
+            public void run() {
+                app.getConnectionManager().sendData("GET_SIMS\n");
+            }
+        });
         menu.add(new net.rim.device.api.ui.MenuItem("Rafraîchir le réseau", 110, 15) {
             public void run() {
                 app.getConnectionManager().sendData("GET_NETWORK\n");

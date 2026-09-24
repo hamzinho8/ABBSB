@@ -222,13 +222,12 @@ public class ContactListScreen extends MainScreen {
         int selectedIndex = contactList.getSelectedIndex();
         if (selectedIndex >= 0 && selectedIndex < currentDisplayedContacts.size()) {
             final Contact c = (Contact) currentDisplayedContacts.elementAt(selectedIndex);
-            contactManager.callContact(c.number);
-            UiApplication.getUiApplication().invokeLater(new Runnable() {
-                public void run() {
-                    Dialog.inform("Appel en cours vers " + c.name);
-                }
-            });
             close();
+            if (app != null && app.getCallManager() != null) {
+                app.getCallManager().initiateOutboundCall(c.number, c.name);
+            } else {
+                contactManager.callContact(c.number, c.name);
+            }
         }
     }
     

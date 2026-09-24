@@ -280,7 +280,13 @@ public class ContactManager {
     }
     
     public void callContact(String number) {
-        if (app.getConnectionManager() != null && number != null) {
+        callContact(number, null);
+    }
+    
+    public void callContact(String number, String name) {
+        if (app != null && app.getCallManager() != null && number != null) {
+            app.getCallManager().initiateOutboundCall(number, name);
+        } else if (app != null && app.getConnectionManager() != null && number != null) {
             app.getConnectionManager().sendData("CALL_OUTBOUND|" + number + "\n");
         }
     }

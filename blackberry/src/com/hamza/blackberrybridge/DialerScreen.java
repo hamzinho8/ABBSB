@@ -69,15 +69,8 @@ public class DialerScreen extends MainScreen {
         }
         
         if (number != null && number.length() > 0) {
-            app.getConnectionManager().sendData("CALL_OUTBOUND|" + number + "\n");
-            
-            UiApplication.getUiApplication().invokeLater(new Runnable() {
-                public void run() {
-                    Dialog.inform("Appel lancé vers " + phoneField.getText().trim());
-                }
-            });
-            
             close();
+            app.getCallManager().initiateOutboundCall(number, null);
         } else {
             UiApplication.getUiApplication().invokeLater(new Runnable() {
                 public void run() {
