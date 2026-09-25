@@ -18,11 +18,34 @@ public class ProtocolManager {
     public void processMessage(String message) {
         if (message == null || message.length() == 0) return;
         
-        // 1. Détection ultra-rapide des trames audio VOICE_TX (50 paquets/sec)
-        // Contourne split() et LogManager pour éviter le GC thrashing et la latence
+        // 1. Détection ultra-rapide des commandes audio de streaming temps réel
+        // Contourne split() et LogManager pour éliminer le GC thrashing et la latence
+        if (message.startsWith("VOICE_START")) {
+            int rate = 8000;
+            int channels = 1;
+            int bits = 16;
+            String[] vparts = split(message, '|');
+            if (vparts.length >= 2) {
+                try { rate = Integer.parseInt(vparts[1].trim()); } catch (Exception ignored) {}
+            }
+            if (vparts.length >= 3) {
+                try { channels = Integer.parseInt(vparts[2].trim()); } catch (Exception ignored) {}
+            }
+            if (vparts.length >= 4) {
+                try { bits = Integer.parseInt(vparts[3].trim()); } catch (Exception ignored) {}
+            }
+            StreamingAudioPlayer.getInstance().startAudioStream(rate, channels, bits);
+            return;
+        }
+
         if (message.startsWith("VOICE_TX|")) {
             String base64Data = message.substring(9);
-            app.getCallAudioPlayerRecorder().playVoicePacket(base64Data);
+            StreamingAudioPlayer.getInstance().writeChunk(base64Data);
+            return;
+        }
+
+        if (message.equals("VOICE_STOP")) {
+            StreamingAudioPlayer.getInstance().stopAudioStream();
             return;
         }
         
