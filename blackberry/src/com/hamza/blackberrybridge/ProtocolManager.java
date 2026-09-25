@@ -100,6 +100,17 @@ public class ProtocolManager {
                 String route = (parts.length >= 2) ? parts[1] : "BLUETOOTH";
                 app.getCallManager().handleAudioStatus(route);
             }
+            else if (command.equals("VOICE_TX")) {
+                if (parts.length >= 2) {
+                    app.getCallAudioPlayerRecorder().playVoicePacket(parts[1]);
+                }
+            }
+            else if (command.equals("VOICE_BRIDGE_START")) {
+                app.getCallAudioPlayerRecorder().startVoiceBridge();
+            }
+            else if (command.equals("VOICE_BRIDGE_STOP")) {
+                app.getCallAudioPlayerRecorder().stopVoiceBridge();
+            }
             else if (command.equals("CONTACTS_CLEAR")) {
                 app.getContactManager().clearContacts();
             }

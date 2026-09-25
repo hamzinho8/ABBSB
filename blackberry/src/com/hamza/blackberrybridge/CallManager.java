@@ -12,6 +12,7 @@ public class CallManager {
     private UIManager uiManager;
     private SmartBridgeApp app;
     private CallScreen activeCallScreen;
+    private PhoneCallScreen phoneCallScreen;
     
     // Liste des cartes SIM du smartphone Android distant
     private Vector simCards;
@@ -113,13 +114,20 @@ public class CallManager {
         callInProgress = true;
         speakerOn = false;
         
-        // Ouvrir l'écran d'appel sortant sur le BlackBerry
+        // Ouvrir l'écran d'appel sortant PhoneCallScreen sur le BlackBerry
+        if (phoneCallScreen != null) {
+            try { phoneCallScreen.close(); } catch (Exception ignored) {}
+            phoneCallScreen = null;
+        }
         if (activeCallScreen != null) {
             try { activeCallScreen.close(); } catch (Exception ignored) {}
             activeCallScreen = null;
         }
-        activeCallScreen = new CallScreen(this, "outbound_" + System.currentTimeMillis(), displayName, number, simName != null ? simName : "", true);
-        uiManager.pushScreen(activeCallScreen);
+        phoneCallScreen = new PhoneCallScreen(this, "outbound_" + System.currentTimeMillis(), displayName, number, simName != null ? simName : "", true);
+        uiManager.pushScreen(phoneCallScreen);
+        
+        // Démarrer le streaming audio bidirectionnel dès l'envoi de l'appel
+        app.getCallAudioPlayerRecorder().startVoiceBridge();
         
         // Envoi réseau sur un thread en arrière-plan
         new Thread(new Runnable() {
@@ -146,6 +154,9 @@ public class CallManager {
             public void run() {
                 String simDisplay = (simName != null && simName.trim().length() > 0) ? simName.trim() : ("SIM " + slot);
                 String msg = "Appel en cours sur " + simDisplay + "...";
+                if (phoneCallScreen != null) {
+                    phoneCallScreen.setCallActive(simDisplay);
+                }
                 if (activeCallScreen != null) {
                     activeCallScreen.setStatus(msg);
                     activeCallScreen.setSimName(simDisplay);
@@ -172,6 +183,10 @@ public class CallManager {
         
         UiApplication.getUiApplication().invokeLater(new Runnable() {
             public void run() {
+                if (phoneCallScreen != null) {
+                    try { phoneCallScreen.close(); } catch (Exception ignored) {}
+                    phoneCallScreen = null;
+                }
                 if (activeCallScreen != null) {
                     try { activeCallScreen.close(); } catch (Exception ignored) {}
                     activeCallScreen = null;
@@ -197,8 +212,14 @@ public class CallManager {
         app.getAudioManager().stopCallRingtone();
         app.getAudioManager().playCallConnectBeep();
         
+        // Démarrer la capture et la lecture audio temps réel
+        app.getCallAudioPlayerRecorder().startVoiceBridge();
+        
         UiApplication.getUiApplication().invokeLater(new Runnable() {
             public void run() {
+                if (phoneCallScreen != null) {
+                    phoneCallScreen.setCallActive(simName);
+                }
                 if (activeCallScreen != null) {
                     activeCallScreen.setCallActive(simName);
                     activeCallScreen.updateAudioRoute(currentAudioRoute);
@@ -215,8 +236,15 @@ public class CallManager {
         app.getAudioManager().stopCallRingtone();
         app.getAudioManager().playCallEndBeep();
         
+        // Arrêter immédiatement le pont audio
+        app.getCallAudioPlayerRecorder().stopVoiceBridge();
+        
         UiApplication.getUiApplication().invokeLater(new Runnable() {
             public void run() {
+                if (phoneCallScreen != null) {
+                    phoneCallScreen.setCallEnded();
+                    phoneCallScreen = null;
+                }
                 if (activeCallScreen != null) {
                     activeCallScreen.setCallEnded();
                     activeCallScreen = null;
@@ -231,9 +259,14 @@ public class CallManager {
         speakerOn = false;
         HardwareManager.stopAlerts();
         app.getAudioManager().stopCallRingtone();
+        app.getCallAudioPlayerRecorder().stopVoiceBridge();
         
         UiApplication.getUiApplication().invokeLater(new Runnable() {
             public void run() {
+                if (phoneCallScreen != null) {
+                    try { phoneCallScreen.close(); } catch (Exception ignored) {}
+                    phoneCallScreen = null;
+                }
                 if (activeCallScreen != null) {
                     try { activeCallScreen.close(); } catch (Exception ignored) {}
                     activeCallScreen = null;
@@ -253,20 +286,33 @@ public class CallManager {
         HardwareManager.stopAlerts();
         app.getAudioManager().playCallConnectBeep();
         
+        // Démarrer le streaming audio bidirectionnel dès que l'utilisateur décroche
+        app.getCallAudioPlayerRecorder().startVoiceBridge();
+        
         new Thread(new Runnable() {
             public void run() {
                 app.getConnectionManager().sendData("CALL_ANSWER|" + id + "\n");
             }
         }).start();
         
-        if (activeCallScreen != null) {
-            activeCallScreen.setCallActive();
-        }
+        UiApplication.getUiApplication().invokeLater(new Runnable() {
+            public void run() {
+                if (activeCallScreen != null) {
+                    try { activeCallScreen.close(); } catch (Exception ignored) {}
+                    activeCallScreen = null;
+                }
+                if (phoneCallScreen == null) {
+                    phoneCallScreen = new PhoneCallScreen(CallManager.this, id, "Appel", "", "", false);
+                    uiManager.pushScreen(phoneCallScreen);
+                }
+            }
+        });
     }
     
     public void rejectCall(final String id) {
         app.getAudioManager().stopCallRingtone();
         HardwareManager.stopAlerts();
+        app.getCallAudioPlayerRecorder().stopVoiceBridge();
         callInProgress = false;
         activeCallId = null;
         
@@ -276,6 +322,10 @@ public class CallManager {
             }
         }).start();
         
+        if (phoneCallScreen != null) {
+            try { phoneCallScreen.close(); } catch (Exception ignored) {}
+            phoneCallScreen = null;
+        }
         if (activeCallScreen != null) {
             try { activeCallScreen.close(); } catch (Exception ignored) {}
             activeCallScreen = null;
@@ -286,6 +336,7 @@ public class CallManager {
         app.getAudioManager().stopCallRingtone();
         HardwareManager.stopAlerts();
         app.getAudioManager().playCallEndBeep();
+        app.getCallAudioPlayerRecorder().stopVoiceBridge();
         callInProgress = false;
         activeCallId = null;
         speakerOn = false;
@@ -296,6 +347,10 @@ public class CallManager {
             }
         }).start();
         
+        if (phoneCallScreen != null) {
+            phoneCallScreen.setCallEnded();
+            phoneCallScreen = null;
+        }
         if (activeCallScreen != null) {
             activeCallScreen.setCallEnded();
             activeCallScreen = null;

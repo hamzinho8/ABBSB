@@ -76,7 +76,7 @@ public class BluetoothServer {
 
         // 3. Hands-Free Profile (HFP 0x111E) listener & SDP Service Record registration
         try {
-            String hfpUrl = "btspp://localhost:" + UUID_HFP_HF + ";name=BlackBerry Handsfree Unit;authorize=false;authenticate=false;encrypt=false;master=false";
+            String hfpUrl = "btspp://localhost:" + UUID_HFP_HF + ";name=BlackBerry Handsfree;authorize=false;authenticate=false;encrypt=false;master=false";
             hfpListener = new HfpListenerThread(hfpUrl, "HFP_111E");
             hfpListener.start();
         } catch (Throwable t) {
@@ -283,9 +283,10 @@ public class BluetoothServer {
                         LocalDevice localDev = LocalDevice.getLocalDevice();
                         ServiceRecord rec = localDev.getRecord(notifier);
                         if (rec != null) {
-                            // 1. ServiceClassIDList (0x0001): Handsfree (0x111E) + GenericAudio (0x1203)
+                            // 1. ServiceClassIDList (0x0001): Handsfree (0x111E) + Headset (0x1108) + GenericAudio (0x1203)
                             DataElement classSeq = new DataElement(DataElement.DATSEQ);
                             classSeq.addElement(new DataElement(DataElement.UUID, new UUID(0x111E)));
+                            classSeq.addElement(new DataElement(DataElement.UUID, new UUID(0x1108)));
                             classSeq.addElement(new DataElement(DataElement.UUID, new UUID(0x1203)));
                             rec.setAttributeValue(0x0001, classSeq);
 
@@ -297,8 +298,8 @@ public class BluetoothServer {
                             profDesc.addElement(hfpProf);
                             rec.setAttributeValue(0x0009, profDesc);
 
-                            // 3. ServiceName (0x0100)
-                            rec.setAttributeValue(0x0100, new DataElement(DataElement.STRING, "BlackBerry Handsfree Unit"));
+                            // 3. ServiceName (0x0100): "BlackBerry Handsfree"
+                            rec.setAttributeValue(0x0100, new DataElement(DataElement.STRING, "BlackBerry Handsfree"));
 
                             // 4. SupportedFeatures (0x0311): 0x001F (EC/NR, 3-way calling, CLI, Voice recog, Volume)
                             rec.setAttributeValue(0x0311, new DataElement(DataElement.U_INT_2, 0x001F));
