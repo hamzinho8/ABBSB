@@ -161,7 +161,7 @@ public class CallManager {
                     activeCallScreen.setStatus(msg);
                     activeCallScreen.setSimName(simDisplay);
                 }
-                Dialog.inform(msg);
+                // Traitement silencieux sans popup bloquante Dialog.inform
             }
         });
     }
@@ -191,8 +191,8 @@ public class CallManager {
                     try { activeCallScreen.close(); } catch (Exception ignored) {}
                     activeCallScreen = null;
                 }
-                activeCallScreen = new CallScreen(CallManager.this, id, name, number, simName, false);
-                uiManager.pushScreen(activeCallScreen);
+                phoneCallScreen = new PhoneCallScreen(CallManager.this, id, name, number, simName, false);
+                uiManager.pushScreen(phoneCallScreen);
             }
         });
     }

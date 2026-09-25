@@ -2,6 +2,10 @@ package com.hamza.blackberrybridge;
 
 import java.util.Vector;
 
+/**
+ * Gestionnaire du protocole Bluetooth RFCOMM bidirectionnel BSB/1.
+ * Optimisé pour le streaming audio temps réel (VOICE_TX / VOICE_RX) et la téléphonie double SIM.
+ */
 public class ProtocolManager {
     private ConnectionManager connectionManager;
     private SmartBridgeApp app;
@@ -13,6 +17,24 @@ public class ProtocolManager {
     
     public void processMessage(String message) {
         if (message == null || message.length() == 0) return;
+        
+        // 1. Détection ultra-rapide des trames audio VOICE_TX (50 paquets/sec)
+        // Contourne split() et LogManager pour éviter le GC thrashing et la latence
+        if (message.startsWith("VOICE_TX|")) {
+            String base64Data = message.substring(9);
+            app.getCallAudioPlayerRecorder().playVoicePacket(base64Data);
+            return;
+        }
+        
+        // Ignorer les échos ou accusés VOICE_RX
+        if (message.startsWith("VOICE_RX|")) {
+            return;
+        }
+        
+        // Ignorer silencieusement les paquets d'accusé de réception (OK, ACK, etc.) sans popup
+        if (message.equals("OK") || message.equals("ACK") || message.startsWith("ACK|")) {
+            return;
+        }
         
         String[] parts = split(message, '|');
         if (parts.length == 0) return;
@@ -100,11 +122,6 @@ public class ProtocolManager {
                 String route = (parts.length >= 2) ? parts[1] : "BLUETOOTH";
                 app.getCallManager().handleAudioStatus(route);
             }
-            else if (command.equals("VOICE_TX")) {
-                if (parts.length >= 2) {
-                    app.getCallAudioPlayerRecorder().playVoicePacket(parts[1]);
-                }
-            }
             else if (command.equals("VOICE_BRIDGE_START")) {
                 app.getCallAudioPlayerRecorder().startVoiceBridge();
             }
@@ -129,7 +146,6 @@ public class ProtocolManager {
                 if (parts.length >= 4) {
                     app.getContactManager().handleContact(parts[1], parts[2], parts[3]);
                 } else if (parts.length == 3) {
-                    // Fallback for CONTACT|<nom>|<numero>
                     app.getContactManager().handleContact("", parts[1], parts[2]);
                 }
             }
@@ -158,13 +174,15 @@ public class ProtocolManager {
                 }
             }
             else if (command.equals("FIND_PHONE")) {
-                HardwareManager.startFindPhoneAlert();
-                app.getUIManager().showFindPhonePopup();
-            }
-            else if (command.equals("FIND_PHONE_STOP")) {
-                HardwareManager.stopFindPhoneAlert();
-                app.getUIManager().hideFindPhonePopup();
-                app.getUIManager().hideSearchingPhonePopup();
+                if (parts.length >= 2) {
+                    if (parts[1].equals("START")) {
+                        app.getUIManager().showFindPhonePopup();
+                        HardwareManager.startFindPhoneAlert();
+                    } else if (parts[1].equals("STOP")) {
+                        app.getUIManager().hideFindPhonePopup();
+                        HardwareManager.stopFindPhoneAlert();
+                    }
+                }
             }
             else if (command.equals("PHONE_FOUND") || command.equals("FIND_PHONE_STOPPED")) {
                 app.getUIManager().onPhoneFound();
@@ -197,11 +215,10 @@ public class ProtocolManager {
                 // Clipboard sync disabled due to signature requirement
             }
             else {
-                LogManager.log("PROTOCOL", "Unknown command: " + command);
+                LogManager.log("PROTOCOL", "Ignored command: " + command);
             }
         } catch (Exception e) {
             LogManager.error("PROTOCOL", "Parse error: " + e.getMessage());
-            connectionManager.sendData("ERROR|INTERNAL_ERROR\n");
         }
     }
     

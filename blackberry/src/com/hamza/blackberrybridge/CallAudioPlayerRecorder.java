@@ -7,22 +7,30 @@ import javax.microedition.media.Manager;
 import javax.microedition.media.Player;
 import javax.microedition.media.control.RecordControl;
 import javax.microedition.media.control.VolumeControl;
-import net.rim.device.api.io.Base64InputStream;
-import net.rim.device.api.io.Base64OutputStream;
 import net.rim.device.api.media.control.AudioPathControl;
 
 /**
- * Module de streaming audio bidirectionnel temps réel pour BlackBerry Curve 9300.
- * Volet 1 :
- * - Réception des trames PCM 8000Hz 16-bit Mono (320 octets = 20ms) via "VOICE_TX|<base64>"
- *   et lecture continue via un Player javax.microedition.media sans latence ni grésillement.
- * - Capture du microphone BlackBerry via Manager.createPlayer("capture://audio?encoding=pcm...")
- *   et transmission au smartphone Android sous la forme "VOICE_RX|<base64>".
- * - Routage dynamique entre l'écouteur interne (EARPIECE / HANDSET) et le haut-parleur (SPEAKERPHONE).
+ * Module de streaming audio bidirectionnel temps réel pour BlackBerry Curve 9300 (OS 5.0).
+ * 
+ * 1. Réception et lecture (Écouteur ou Haut-parleur BlackBerry) :
+ *    - Paquets "VOICE_TX|<base64>" décodés sans allocation mémoire via un buffer statique réutilisable.
+ *    - Lecture continue fluide PCM 8000 Hz, 16-bit Mono (320 octets = 20ms) via un Player
+ *      javax.microedition.media.Manager avec type MIME "audio/x-wav" et en-tête WAV 44 octets.
+ *    - Tampon circulaire (Ring Buffer) évitant la latence, les coupures et le jitter audio.
+ * 
+ * 2. Capture Microphone BlackBerry :
+ *    - Capture via Manager.createPlayer("capture://audio?encoding=pcm&rate=8000&bits=16&channels=1").
+ *    - Ne transmet les trames "VOICE_RX|<base64>" QUE si l'appel est actif.
+ *    - À la réception de CALL_END : arrêt immédiat de la capture micro pour économiser la batterie
+ *      et soulager le CPU du Curve 9300.
+ * 
+ * 3. Routage audio et Volume :
+ *    - Bascule dynamique EARPIECE / SPEAKERPHONE via AudioPathControl.
+ *    - Réglage du volume via VolumeControl (0 à 100%).
  */
 public class CallAudioPlayerRecorder {
     private SmartBridgeApp app;
-    private boolean isStreaming = false;
+    private volatile boolean isStreaming = false;
     
     // Composants de lecture (Playback)
     private Player playbackPlayer;
@@ -30,10 +38,28 @@ public class CallAudioPlayerRecorder {
     private int audioPath = AudioPathControl.AUDIO_PATH_HANDSET; // Écouteur par défaut
     private int volume = 85; // 0 - 100
     
+    // Buffer statique réutilisable pour décodage Base64 sans GC thrashing
+    private final byte[] pcmDecodeBuffer = new byte[1024];
+    
     // Composants d'enregistrement (Microphone capture)
     private Player recordPlayer;
     private RecordControl recordControl;
     private MicPcmSender micSender;
+    
+    // Table de décodage Base64 rapide
+    private static final byte[] BASE64_DECODE_TABLE = new byte[128];
+    static {
+        for (int i = 0; i < 128; i++) BASE64_DECODE_TABLE[i] = -1;
+        for (int i = 'A'; i <= 'Z'; i++) BASE64_DECODE_TABLE[i] = (byte)(i - 'A');
+        for (int i = 'a'; i <= 'z'; i++) BASE64_DECODE_TABLE[i] = (byte)(i - 'a' + 26);
+        for (int i = '0'; i <= '9'; i++) BASE64_DECODE_TABLE[i] = (byte)(i - '0' + 52);
+        BASE64_DECODE_TABLE['+'] = 62;
+        BASE64_DECODE_TABLE['/'] = 63;
+    }
+    
+    // Table d'encodage Base64 rapide
+    private static final char[] BASE64_ENCODE_CHARS = 
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".toCharArray();
     
     public CallAudioPlayerRecorder(SmartBridgeApp app) {
         this.app = app;
@@ -44,7 +70,7 @@ public class CallAudioPlayerRecorder {
      */
     public synchronized void startVoiceBridge() {
         if (isStreaming) {
-            LogManager.log("AUDIO_BRIDGE", "Voice bridge already running");
+            LogManager.log("AUDIO_BRIDGE", "Voice bridge already active");
             return;
         }
         isStreaming = true;
@@ -92,7 +118,7 @@ public class CallAudioPlayerRecorder {
                     recordControl = (RecordControl) recordPlayer.getControl("RecordControl");
                     
                     if (recordControl != null) {
-                        micSender = new MicPcmSender(app);
+                        micSender = new MicPcmSender(app, CallAudioPlayerRecorder.this);
                         recordControl.setRecordStream(micSender);
                         recordControl.startRecord();
                         recordPlayer.start();
@@ -109,26 +135,69 @@ public class CallAudioPlayerRecorder {
     
     /**
      * Traite un paquet audio entrant reçu du smartphone Android : "VOICE_TX|<base64>"
+     * Utilise un buffer réutilisable (pcmDecodeBuffer) pour éliminer les allocations mémoires
+     * et éviter tout ralentissement du Garbage Collector sur le BlackBerry Curve 9300.
      */
     public void playVoicePacket(String base64Data) {
         if (!isStreaming || base64Data == null || base64Data.length() == 0) return;
+        
         try {
-            byte[] pcmChunk = Base64InputStream.decode(base64Data);
-            if (pcmChunk != null && pcmChunk.length > 0 && playbackStream != null) {
-                playbackStream.writePcm(pcmChunk, 0, pcmChunk.length);
+            synchronized (pcmDecodeBuffer) {
+                int decodedLen = decodeBase64Fast(base64Data, pcmDecodeBuffer);
+                if (decodedLen > 0 && playbackStream != null) {
+                    playbackStream.writePcm(pcmDecodeBuffer, 0, decodedLen);
+                }
             }
-        } catch (IOException e) {
-            LogManager.error("AUDIO_BRIDGE", "Base64 decode error: " + e.getMessage());
+        } catch (Throwable t) {
+            // Ignorer silencieusement les trames corrompues pour éviter les grésillements
         }
     }
     
     /**
-     * Arrête proprement le pont audio et libère les ressources matérielles RIM.
+     * Décodeur Base64 haute performance sans allocation d'objets.
+     * Écrit directement dans le tampon pré-alloué 'out'.
+     */
+    private int decodeBase64Fast(String s, byte[] out) {
+        int len = s.length();
+        int outIdx = 0;
+        int maxOut = out.length;
+        int i = 0;
+        
+        while (i < len && outIdx < maxOut) {
+            char c1 = s.charAt(i++);
+            if (c1 <= ' ') continue;
+            if (i >= len) break;
+            char c2 = s.charAt(i++);
+            if (i >= len) break;
+            char c3 = s.charAt(i++);
+            if (i >= len) break;
+            char c4 = s.charAt(i++);
+            
+            int b1 = (c1 < 128) ? BASE64_DECODE_TABLE[c1] : -1;
+            int b2 = (c2 < 128) ? BASE64_DECODE_TABLE[c2] : -1;
+            int b3 = (c3 < 128 && c3 != '=') ? BASE64_DECODE_TABLE[c3] : -1;
+            int b4 = (c4 < 128 && c4 != '=') ? BASE64_DECODE_TABLE[c4] : -1;
+            
+            if (b1 >= 0 && b2 >= 0) {
+                out[outIdx++] = (byte) ((b1 << 2) | (b2 >> 4));
+                if (c3 != '=' && b3 >= 0 && outIdx < maxOut) {
+                    out[outIdx++] = (byte) (((b2 & 0x0F) << 4) | (b3 >> 2));
+                    if (c4 != '=' && b4 >= 0 && outIdx < maxOut) {
+                        out[outIdx++] = (byte) (((b3 & 0x03) << 6) | b4);
+                    }
+                }
+            }
+        }
+        return outIdx;
+    }
+    
+    /**
+     * Arrête immédiatement le pont audio et libère les ressources matérielles (CPU/Batterie).
      */
     public synchronized void stopVoiceBridge() {
         if (!isStreaming) return;
         isStreaming = false;
-        LogManager.log("AUDIO_BRIDGE", "Stopping bidirectional voice bridge...");
+        LogManager.log("AUDIO_BRIDGE", "Stopping bidirectional voice bridge immediately...");
         
         stopCapture();
         stopPlayback();
@@ -247,12 +316,12 @@ public class CallAudioPlayerRecorder {
     // Flux de lecture WAV avec Ring Buffer (PcmAudioStream)
     // =========================================================================
     private static class PcmAudioStream extends InputStream {
-        private byte[] header = new byte[44];
+        private final byte[] header = new byte[44];
         private int headerPos = 0;
-        private byte[] ringBuffer = new byte[8192];
+        private final byte[] ringBuffer = new byte[16384]; // 16 Ko tampon circulaire (~1s)
         private int head = 0;
         private int tail = 0;
-        private boolean closed = false;
+        private volatile boolean closed = false;
 
         public PcmAudioStream() {
             buildWavHeader(header, 8000, 1, 16);
@@ -283,8 +352,8 @@ public class CallAudioPlayerRecorder {
             }
             while (head == tail && !closed) {
                 try {
-                    wait(20);
-                    if (head == tail) return 0; // Trame de silence pour éviter le grésillement
+                    wait(15);
+                    if (head == tail) return 0; // Trame de silence pour éviter les bruits parasites
                 } catch (InterruptedException e) {
                     return 0;
                 }
@@ -298,6 +367,7 @@ public class CallAudioPlayerRecorder {
         public synchronized int read(byte[] b, int off, int len) throws IOException {
             if (b == null) throw new NullPointerException();
             if (len == 0) return 0;
+            
             int readBytes = 0;
             if (headerPos < 44) {
                 int toCopy = Math.min(len, 44 - headerPos);
@@ -310,7 +380,7 @@ public class CallAudioPlayerRecorder {
             }
             while (head == tail && !closed) {
                 try {
-                    wait(20);
+                    wait(15);
                     if (head == tail) {
                         for (int i = 0; i < len; i++) b[off + i] = 0;
                         return readBytes + len;
@@ -352,22 +422,25 @@ public class CallAudioPlayerRecorder {
     // =========================================================================
     private static class MicPcmSender extends OutputStream {
         private SmartBridgeApp app;
-        private byte[] chunk = new byte[320]; // 20ms à 8000Hz 16-bit Mono
+        private CallAudioPlayerRecorder parent;
+        private final byte[] chunk = new byte[320]; // 20ms à 8000Hz 16-bit Mono
+        private final char[] base64Chars = new char[440];
         private int count = 0;
-        private boolean active = true;
+        private volatile boolean active = true;
 
-        public MicPcmSender(SmartBridgeApp app) {
+        public MicPcmSender(SmartBridgeApp app, CallAudioPlayerRecorder parent) {
             this.app = app;
+            this.parent = parent;
         }
 
         public synchronized void write(int b) {
-            if (!active) return;
+            if (!active || !parent.isStreaming()) return;
             chunk[count++] = (byte) b;
             if (count >= 320) flushChunk();
         }
 
         public synchronized void write(byte[] b, int off, int len) {
-            if (!active || b == null) return;
+            if (!active || !parent.isStreaming() || b == null) return;
             while (len > 0) {
                 int toCopy = Math.min(len, 320 - count);
                 System.arraycopy(b, off, chunk, count, toCopy);
@@ -379,14 +452,48 @@ public class CallAudioPlayerRecorder {
         }
 
         private void flushChunk() {
-            if (!active) return;
+            if (!active || !parent.isStreaming()) {
+                count = 0;
+                return;
+            }
             try {
-                String base64 = Base64OutputStream.encodeAsString(chunk, 0, 320, false, false);
-                app.getConnectionManager().sendData("VOICE_RX|" + base64 + "\n");
+                // Encodage Base64 direct sans allouer d'objets intermédiaires
+                int charCount = encodeBase64Fast(chunk, 320, base64Chars);
+                String base64Str = new String(base64Chars, 0, charCount);
+                app.getConnectionManager().sendData("VOICE_RX|" + base64Str + "\n");
             } catch (Throwable t) {
-                LogManager.error("AUDIO_MIC", "Error encoding VOICE_RX: " + t.getMessage());
+                LogManager.error("AUDIO_MIC", "Error sending VOICE_RX: " + t.getMessage());
             }
             count = 0;
+        }
+
+        private int encodeBase64Fast(byte[] in, int len, char[] outBuf) {
+            int outIdx = 0;
+            int end = len - (len % 3);
+            for (int i = 0; i < end; i += 3) {
+                int b1 = in[i] & 0xFF;
+                int b2 = in[i + 1] & 0xFF;
+                int b3 = in[i + 2] & 0xFF;
+                outBuf[outIdx++] = BASE64_ENCODE_CHARS[b1 >>> 2];
+                outBuf[outIdx++] = BASE64_ENCODE_CHARS[((b1 & 0x03) << 4) | (b2 >>> 4)];
+                outBuf[outIdx++] = BASE64_ENCODE_CHARS[((b2 & 0x0F) << 2) | (b3 >>> 6)];
+                outBuf[outIdx++] = BASE64_ENCODE_CHARS[b3 & 0x3F];
+            }
+            if (len % 3 == 1) {
+                int b1 = in[end] & 0xFF;
+                outBuf[outIdx++] = BASE64_ENCODE_CHARS[b1 >>> 2];
+                outBuf[outIdx++] = BASE64_ENCODE_CHARS[(b1 & 0x03) << 4];
+                outBuf[outIdx++] = '=';
+                outBuf[outIdx++] = '=';
+            } else if (len % 3 == 2) {
+                int b1 = in[end] & 0xFF;
+                int b2 = in[end + 1] & 0xFF;
+                outBuf[outIdx++] = BASE64_ENCODE_CHARS[b1 >>> 2];
+                outBuf[outIdx++] = BASE64_ENCODE_CHARS[((b1 & 0x03) << 4) | (b2 >>> 4)];
+                outBuf[outIdx++] = BASE64_ENCODE_CHARS[(b2 & 0x0F) << 2];
+                outBuf[outIdx++] = '=';
+            }
+            return outIdx;
         }
 
         public synchronized void close() {

@@ -168,27 +168,31 @@ public class BluetoothServer {
 
             connectionManager.onConnected();
 
-            // Read stream loop
-            StringBuffer buffer = new StringBuffer();
-            int ch;
+            // Read stream loop with 1024-byte block reading for optimal high-throughput audio
+            byte[] readBuffer = new byte[1024];
+            StringBuffer buffer = new StringBuffer(512);
+            int read;
             while (running && connected) {
-                ch = inputStream.read();
-                if (ch == -1) {
+                read = inputStream.read(readBuffer);
+                if (read == -1) {
                     LogManager.log("BT_SRV", "Stream closed by peer");
                     break;
                 }
 
-                if (ch == '\n') {
-                    String line = buffer.toString().trim();
-                    buffer.setLength(0);
-                    if (line.length() > 0) {
-                        connectionManager.onDataReceived(line);
-                    }
-                } else if (ch != '\r') {
-                    buffer.append((char) ch);
-                    if (buffer.length() > 4096) {
-                        LogManager.error("BT_SRV", "Buffer overflow, dropping line");
+                for (int i = 0; i < read; i++) {
+                    char ch = (char) (readBuffer[i] & 0xFF);
+                    if (ch == '\n') {
+                        String line = buffer.toString().trim();
                         buffer.setLength(0);
+                        if (line.length() > 0) {
+                            connectionManager.onDataReceived(line);
+                        }
+                    } else if (ch != '\r') {
+                        buffer.append(ch);
+                        if (buffer.length() > 4096) {
+                            LogManager.error("BT_SRV", "Buffer overflow, dropping line");
+                            buffer.setLength(0);
+                        }
                     }
                 }
             }
