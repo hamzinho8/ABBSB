@@ -141,6 +141,10 @@ public class ProtocolManager {
                 String status = (parts.length >= 2) ? parts[1] : "OFF";
                 app.getCallManager().handleSpeakerStatus(status);
             }
+            else if (command.equals("MUTE_STATUS")) {
+                String status = (parts.length >= 2) ? parts[1] : "OFF";
+                app.getCallManager().handleMuteStatus(status);
+            }
             else if (command.equals("AUDIO_STATUS") || command.equals("AUDIO_ROUTE")) {
                 String route = (parts.length >= 2) ? parts[1] : "BLUETOOTH";
                 app.getCallManager().handleAudioStatus(route);

@@ -19,6 +19,7 @@ public class CallManager {
     private String activeCallId;
     private boolean callInProgress = false;
     private boolean speakerOn = false;
+    private boolean micMuted = false;
     private String currentAudioRoute = "BLUETOOTH";
     
     public CallManager(UIManager uiManager, SmartBridgeApp app) {
@@ -360,8 +361,12 @@ public class CallManager {
     public void toggleSpeaker() {
         new Thread(new Runnable() {
             public void run() {
-                LogManager.log("CALL", "Sending SPEAKER_TOGGLE");
-                app.getConnectionManager().sendData("SPEAKER_TOGGLE\n");
+                try {
+                    LogManager.log("CALL", "Sending SPEAKER_TOGGLE");
+                    app.getConnectionManager().sendData("SPEAKER_TOGGLE\n");
+                } catch (Throwable t) {
+                    LogManager.error("CALL", "Error in toggleSpeaker: " + t.getMessage());
+                }
             }
         }).start();
     }
@@ -372,11 +377,119 @@ public class CallManager {
         
         UiApplication.getUiApplication().invokeLater(new Runnable() {
             public void run() {
-                if (activeCallScreen != null) {
-                    activeCallScreen.updateSpeakerStatus(speakerOn);
-                }
+                try {
+                    if (phoneCallScreen != null) {
+                        phoneCallScreen.updateSpeakerStatus(speakerOn);
+                    }
+                    if (activeCallScreen != null) {
+                        activeCallScreen.updateSpeakerStatus(speakerOn);
+                    }
+                } catch (Throwable ignored) {}
             }
         });
+    }
+
+    public void toggleMute() {
+        this.micMuted = !micMuted;
+        new Thread(new Runnable() {
+            public void run() {
+                try {
+                    LogManager.log("CALL", "Sending MUTE_TOGGLE");
+                    app.getConnectionManager().sendData("MUTE_TOGGLE\n");
+                } catch (Throwable t) {
+                    LogManager.error("CALL", "Error in toggleMute: " + t.getMessage());
+                }
+            }
+        }).start();
+
+        UiApplication.getUiApplication().invokeLater(new Runnable() {
+            public void run() {
+                try {
+                    if (phoneCallScreen != null) {
+                        phoneCallScreen.updateMicStatus(micMuted);
+                    }
+                } catch (Throwable ignored) {}
+            }
+        });
+    }
+
+    public void handleMuteStatus(final String status) {
+        this.micMuted = "ON".equalsIgnoreCase(status) || "MUTED".equalsIgnoreCase(status);
+        LogManager.log("CALL", "Mute status updated: " + status + " (" + micMuted + ")");
+
+        UiApplication.getUiApplication().invokeLater(new Runnable() {
+            public void run() {
+                try {
+                    if (phoneCallScreen != null) {
+                        phoneCallScreen.updateMicStatus(micMuted);
+                    }
+                } catch (Throwable ignored) {}
+            }
+        });
+    }
+
+    public void volumeUp() {
+        new Thread(new Runnable() {
+            public void run() {
+                try {
+                    LogManager.log("CALL", "Sending VOLUME_UP");
+                    app.getConnectionManager().sendData("VOLUME_UP\n");
+                } catch (Throwable t) {
+                    LogManager.error("CALL", "Error sending VOLUME_UP: " + t.getMessage());
+                }
+            }
+        }).start();
+
+        try {
+            StreamingAudioPlayer.getInstance().adjustVolume(5);
+            if (app.getCallAudioPlayerRecorder() != null) {
+                app.getCallAudioPlayerRecorder().adjustVolume(5);
+            }
+        } catch (Throwable ignored) {}
+
+        UiApplication.getUiApplication().invokeLater(new Runnable() {
+            public void run() {
+                try {
+                    if (phoneCallScreen != null) {
+                        phoneCallScreen.updateVolumeDisplay();
+                    }
+                } catch (Throwable ignored) {}
+            }
+        });
+    }
+
+    public void volumeDown() {
+        new Thread(new Runnable() {
+            public void run() {
+                try {
+                    LogManager.log("CALL", "Sending VOLUME_DOWN");
+                    app.getConnectionManager().sendData("VOLUME_DOWN\n");
+                } catch (Throwable t) {
+                    LogManager.error("CALL", "Error sending VOLUME_DOWN: " + t.getMessage());
+                }
+            }
+        }).start();
+
+        try {
+            StreamingAudioPlayer.getInstance().adjustVolume(-5);
+            if (app.getCallAudioPlayerRecorder() != null) {
+                app.getCallAudioPlayerRecorder().adjustVolume(-5);
+            }
+        } catch (Throwable ignored) {}
+
+        UiApplication.getUiApplication().invokeLater(new Runnable() {
+            public void run() {
+                try {
+                    if (phoneCallScreen != null) {
+                        phoneCallScreen.updateVolumeDisplay();
+                    }
+                } catch (Throwable ignored) {}
+            }
+        });
+    }
+
+    public boolean isMicMuted() {
+        return micMuted;
     }
     
     // =========================================================================
