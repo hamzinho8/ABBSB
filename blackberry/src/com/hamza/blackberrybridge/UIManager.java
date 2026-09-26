@@ -87,6 +87,10 @@ public class UIManager {
         pushScreen(new DialerScreen(app, app.getCallManager()));
     }
     
+    public void openCallHistory() {
+        pushScreen(new CallHistoryScreen(app));
+    }
+    
     public void openContacts() {
         pushScreen(new ContactListScreen(app.getContactManager(), app));
     }

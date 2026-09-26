@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Phone, 
   PhoneIncoming, 
+  PhoneOutgoing,
   PhoneOff, 
   Volume2, 
   VolumeX, 
@@ -24,8 +25,13 @@ import {
   Headphones,
   Bluetooth,
   HelpCircle,
-  Clock
+  Clock,
+  History,
+  PhoneCall
 } from 'lucide-react';
+import { CallHistoryModal, CallRecord } from './components/CallHistoryModal';
+import { BatteryDischargeChart } from './components/BatteryDischargeChart';
+
 
 interface Sim {
   name: string;
@@ -55,7 +61,135 @@ export default function App() {
   const [simChoiceModalOpen, setSimChoiceModalOpen] = useState<boolean>(false);
   const [audioChoiceModalOpen, setAudioChoiceModalOpen] = useState<boolean>(false);
   const [hfpGuideModalOpen, setHfpGuideModalOpen] = useState<boolean>(false);
+  const [callHistoryModalOpen, setCallHistoryModalOpen] = useState<boolean>(false);
   const [dialNumber, setDialNumber] = useState<string>('+212634934134');
+  
+  // Call History State
+  const [callRecords, setCallRecords] = useState<CallRecord[]>([
+    {
+      id: 'rec_1',
+      callerName: 'Amina Mansouri',
+      phoneNumber: '+212634934134',
+      timestamp: 'Aujourd\'hui, 14:28',
+      direction: 'incoming',
+      duration: '04:12',
+      simName: 'inwi',
+      status: 'answered'
+    },
+    {
+      id: 'rec_2',
+      callerName: 'Youssef Bennani',
+      phoneNumber: '+212655881230',
+      timestamp: 'Aujourd\'hui, 12:15',
+      direction: 'outgoing',
+      duration: '01:45',
+      simName: 'Orange',
+      status: 'answered'
+    },
+    {
+      id: 'rec_3',
+      callerName: 'Hamza H.',
+      phoneNumber: '+212611223344',
+      timestamp: 'Aujourd\'hui, 10:04',
+      direction: 'incoming',
+      duration: '08:30',
+      simName: 'inwi',
+      status: 'answered'
+    },
+    {
+      id: 'rec_4',
+      callerName: 'Service Client inwi',
+      phoneNumber: '220',
+      timestamp: 'Hier, 18:40',
+      direction: 'outgoing',
+      duration: '02:10',
+      simName: 'inwi',
+      status: 'answered'
+    },
+    {
+      id: 'rec_5',
+      callerName: 'Dr. Karim Lahlou',
+      phoneNumber: '+212672409918',
+      timestamp: 'Hier, 15:22',
+      direction: 'incoming',
+      duration: '00:54',
+      simName: 'Orange',
+      status: 'answered'
+    },
+    {
+      id: 'rec_6',
+      callerName: 'Fatima Zahra',
+      phoneNumber: '+212698712345',
+      timestamp: '24 Sep, 20:11',
+      direction: 'incoming',
+      duration: '05:20',
+      simName: 'inwi',
+      status: 'answered'
+    },
+    {
+      id: 'rec_7',
+      callerName: 'Orange Recharges & Info',
+      phoneNumber: '121',
+      timestamp: '24 Sep, 16:30',
+      direction: 'outgoing',
+      duration: '03:05',
+      simName: 'Orange',
+      status: 'answered'
+    },
+    {
+      id: 'rec_8',
+      callerName: 'Sara Alami',
+      phoneNumber: '+212644332211',
+      timestamp: '23 Sep, 11:05',
+      direction: 'incoming',
+      duration: '02:18',
+      simName: 'inwi',
+      status: 'answered'
+    },
+    {
+      id: 'rec_9',
+      callerName: 'Mehdi Chraibi',
+      phoneNumber: '+212661908877',
+      timestamp: '23 Sep, 09:44',
+      direction: 'outgoing',
+      duration: '00:42',
+      simName: 'Orange',
+      status: 'answered'
+    },
+    {
+      id: 'rec_10',
+      callerName: 'Omar Tazi',
+      phoneNumber: '+212650123456',
+      timestamp: '22 Sep, 17:19',
+      direction: 'incoming',
+      duration: '06:14',
+      simName: 'inwi',
+      status: 'answered'
+    }
+  ]);
+
+  const addCallRecord = (
+    name: string, 
+    number: string, 
+    dir: 'incoming' | 'outgoing', 
+    durationStr: string, 
+    sim: string, 
+    status: 'answered' | 'missed' | 'rejected' = 'answered'
+  ) => {
+    const now = new Date();
+    const timeFormatted = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const newRecord: CallRecord = {
+      id: 'rec_' + Date.now(),
+      callerName: name,
+      phoneNumber: number,
+      timestamp: `Aujourd'hui, ${timeFormatted}`,
+      direction: dir,
+      duration: durationStr,
+      simName: sim,
+      status: status
+    };
+    setCallRecords(prev => [newRecord, ...prev]);
+  };
   
   // Call Duration Timer (00:00)
   const [durationSeconds, setDurationSeconds] = useState<number>(0);
@@ -128,6 +262,7 @@ export default function App() {
     setCallState('idle');
     addLog('TX', `CALL_REJECT|${currentCaller.id}`);
     addLog('UI', 'Appel rejeté - Popup fermée');
+    addCallRecord(currentCaller.name, currentCaller.number, 'incoming', 'Refusé', currentCaller.simName, 'rejected');
   };
 
   // Hangup from BlackBerry
@@ -136,6 +271,12 @@ export default function App() {
     addLog('TX', 'CALL_END');
     addLog('RX', `CALL_END|${currentCaller.id}`);
     addLog('UI', 'Fin d\'appel : Bip sonore BlackBerry (Alert.startAudio)');
+    
+    // Determine call direction
+    const direction: 'incoming' | 'outgoing' = currentCaller.id.startsWith('out_') ? 'outgoing' : 'incoming';
+    const finalDuration = formatDuration(durationSeconds);
+    addCallRecord(currentCaller.name, currentCaller.number, direction, finalDuration, currentCaller.simName, 'answered');
+
     setTimeout(() => {
       setCallState('idle');
       setSpeakerOn(false);
@@ -232,10 +373,17 @@ export default function App() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 text-xs">
+        <div className="flex items-center gap-2 text-xs flex-wrap">
+          <button 
+            onClick={() => setCallHistoryModalOpen(true)}
+            className="px-2.5 py-1 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-md font-mono flex items-center gap-1.5 cursor-pointer transition-colors"
+          >
+            <History className="w-3.5 h-3.5" />
+            Historique Appels ({callRecords.length})
+          </button>
           <button 
             onClick={() => setHfpGuideModalOpen(true)}
-            className="px-2.5 py-1 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 rounded-md font-mono flex items-center gap-1.5 cursor-pointer"
+            className="px-2.5 py-1 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 rounded-md font-mono flex items-center gap-1.5 cursor-pointer transition-colors"
           >
             <HelpCircle className="w-3.5 h-3.5" />
             Guide HFP / Audio
@@ -300,6 +448,9 @@ export default function App() {
                     <button onClick={startOutboundDial} className="bg-[#222] hover:bg-[#333] border border-cyan-800 text-cyan-300 py-1 rounded text-[10px] font-bold text-center cursor-pointer">
                       📞 Calls
                     </button>
+                    <button onClick={() => setCallHistoryModalOpen(true)} className="bg-[#222] hover:bg-[#333] border border-cyan-700 text-cyan-300 py-1 rounded text-[10px] font-bold text-center cursor-pointer">
+                      📜 History
+                    </button>
                     <button className="bg-[#222] border border-gray-700 text-gray-300 py-1 rounded text-[10px] text-center">
                       ✉️ Messages
                     </button>
@@ -308,9 +459,6 @@ export default function App() {
                     </button>
                     <button className="bg-[#222] border border-gray-700 text-gray-300 py-1 rounded text-[10px] text-center">
                       💬 WhatsApp
-                    </button>
-                    <button className="bg-[#222] border border-gray-700 text-gray-300 py-1 rounded text-[10px] text-center">
-                      👤 VIP (10)
                     </button>
                     <button onClick={() => setHfpGuideModalOpen(true)} className="bg-[#222] border border-yellow-700 text-yellow-300 py-1 rounded text-[10px] text-center cursor-pointer">
                       🎧 Audio HFP
@@ -765,9 +913,26 @@ export default function App() {
                 <span>Fin d'appel (CALL_END)</span>
               </button>
             </div>
+
+            <div className="mt-3 pt-2.5 border-t border-gray-800/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <span className="text-gray-400 flex items-center gap-1.5">
+                <History className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Journal d'appels récents : <strong className="text-cyan-400 font-mono">{callRecords.length}</strong></span>
+              </span>
+              <button
+                onClick={() => setCallHistoryModalOpen(true)}
+                className="px-2.5 py-1 bg-cyan-900/40 hover:bg-cyan-800/60 border border-cyan-600/40 hover:border-cyan-500 rounded text-cyan-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <History className="w-3.5 h-3.5" />
+                <span>Afficher le Journal Complet</span>
+              </button>
+            </div>
           </div>
 
-          {/* Card 4: Live Protocol Log Trace */}
+          {/* Card 4: D3.js Battery Discharge Trend Line Chart */}
+          <BatteryDischargeChart currentLevel={88} />
+
+          {/* Card 5: Live Protocol Log Trace */}
           <div className="bg-[#161a22] border border-gray-800 rounded-xl p-3 shadow-sm flex flex-col flex-1">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold text-gray-300 flex items-center gap-1.5">
@@ -861,6 +1026,27 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Call History Modal */}
+      <CallHistoryModal
+        isOpen={callHistoryModalOpen}
+        onClose={() => setCallHistoryModalOpen(false)}
+        callRecords={callRecords}
+        onSelectNumberToCall={(num, name) => {
+          setDialNumber(num);
+          setCallHistoryModalOpen(false);
+          addLog('UI', `Sélection depuis l'historique : ${name} (${num})`);
+          if (sims.length >= 2) {
+            setSimChoiceModalOpen(true);
+          } else {
+            executeOutboundCall(sims[0]?.slot ?? 0, sims[0]?.name ?? 'inwi');
+          }
+        }}
+        onClearHistory={() => {
+          setCallRecords([]);
+          addLog('UI', 'Historique des appels récents réinitialisé');
+        }}
+      />
 
       {/* Compiled Deliverables Footer */}
       <footer className="w-full max-w-6xl mt-6 p-4 bg-[#161a22] border border-gray-800 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs">
