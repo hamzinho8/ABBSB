@@ -46,8 +46,8 @@ public class CallAudioPlayerRecorder {
         isStreaming = true;
         LogManager.log("AUDIO_BRIDGE", "Starting bidirectional voice bridge (PCM 8000Hz 16-bit Mono)...");
         
-        // 1. Initialiser et démarrer le lecteur audio streaming (PipedStream + WAV header 44 octets)
-        StreamingAudioPlayer.getInstance().startAudioStream(8000, 1, 16);
+        // 1. Initialiser et démarrer AudioQueueWorker (File découplée 10 paquets max + lecture J2ME)
+        AudioQueueWorker.getInstance().startAudioStream(8000, 1, 16);
         
         // 2. Initialiser la capture microphone BlackBerry -> Android
         initCapture();
@@ -80,10 +80,10 @@ public class CallAudioPlayerRecorder {
     }
     
     /**
-     * Transmet la trame audio "VOICE_TX|<base64>" au StreamingAudioPlayer singleton.
+     * Transmet la trame audio "VOICE_TX|<base64>" à AudioQueueWorker.
      */
     public void playVoicePacket(String base64Data) {
-        StreamingAudioPlayer.getInstance().writeChunk(base64Data);
+        AudioQueueWorker.getInstance().enqueueBase64(base64Data);
     }
     
     /**
@@ -95,6 +95,7 @@ public class CallAudioPlayerRecorder {
         LogManager.log("AUDIO_BRIDGE", "Stopping bidirectional voice bridge immediately...");
         
         stopCapture();
+        AudioQueueWorker.getInstance().stopAudioStream();
         StreamingAudioPlayer.getInstance().stopAudioStream();
     }
     
@@ -127,35 +128,40 @@ public class CallAudioPlayerRecorder {
      * Bascule la sortie locale entre le combiné (écouteur) et le haut-parleur.
      */
     public synchronized boolean toggleAudioPath() {
-        return StreamingAudioPlayer.getInstance().toggleAudioPath();
+        boolean spk = AudioQueueWorker.getInstance().toggleAudioPath();
+        StreamingAudioPlayer.getInstance().setAudioPath(AudioQueueWorker.getInstance().getAudioPath());
+        return spk;
     }
     
     public synchronized void setAudioPath(int path) {
+        AudioQueueWorker.getInstance().setAudioPath(path);
         StreamingAudioPlayer.getInstance().setAudioPath(path);
     }
     
     public int getAudioPath() {
-        return StreamingAudioPlayer.getInstance().getAudioPath();
+        return AudioQueueWorker.getInstance().getAudioPath();
     }
     
     public boolean isSpeakerOn() {
-        return StreamingAudioPlayer.getInstance().isSpeakerOn();
+        return AudioQueueWorker.getInstance().isSpeakerOn();
     }
     
     public int getVolume() {
-        return StreamingAudioPlayer.getInstance().getVolume();
+        return AudioQueueWorker.getInstance().getVolume();
     }
     
     public synchronized void setVolume(int vol) {
+        AudioQueueWorker.getInstance().setVolume(vol);
         StreamingAudioPlayer.getInstance().setVolume(vol);
     }
     
     public void adjustVolume(int delta) {
+        AudioQueueWorker.getInstance().adjustVolume(delta);
         StreamingAudioPlayer.getInstance().adjustVolume(delta);
     }
     
     public boolean isStreaming() {
-        return isStreaming || StreamingAudioPlayer.getInstance().isPlaying();
+        return isStreaming || AudioQueueWorker.getInstance().isStreaming() || StreamingAudioPlayer.getInstance().isPlaying();
     }
     
     // =========================================================================

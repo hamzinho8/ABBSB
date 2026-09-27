@@ -49,16 +49,21 @@ public class ProtocolManager {
             return;
         }
         
-        // Ignorer les échos ou accusés VOICE_RX
-        if (message.startsWith("VOICE_RX|")) {
+        // Traitement ultra-rapide des flux audio entrants sans allocation (25 paquets/sec)
+        if (message.startsWith("VOICE_TX|")) {
+            String b64 = message.substring(9);
+            AudioQueueWorker.getInstance().enqueueBase64(b64);
             return;
         }
-        
-        // Ignorer silencieusement les paquets d'accusé de réception (OK, ACK, etc.) sans popup
-        if (message.equals("OK") || message.equals("ACK") || message.startsWith("ACK|")) {
+        if (message.startsWith("VOICE_START")) {
+            AudioQueueWorker.getInstance().startAudioStream(8000, 1, 16);
             return;
         }
-        
+        if (message.startsWith("VOICE_STOP")) {
+            AudioQueueWorker.getInstance().stopAudioStream();
+            return;
+        }
+
         String[] parts = split(message, '|');
         if (parts.length == 0) return;
         
@@ -128,10 +133,12 @@ public class ProtocolManager {
             else if (command.equals("CALL_ACTIVE")) {
                 String id = (parts.length >= 2) ? parts[1] : "";
                 String sim = (parts.length >= 3) ? parts[2] : null;
+                AudioQueueWorker.getInstance().startAudioStream(8000, 1, 16);
                 app.getCallManager().handleCallActive(id, sim);
             }
             else if (command.equals("CALL_END")) {
                 String id = (parts.length >= 2) ? parts[1] : "";
+                AudioQueueWorker.getInstance().stopAudioStream();
                 app.getCallManager().handleCallEnd(id);
             }
             else if (command.equals("CALL_MISSED")) {

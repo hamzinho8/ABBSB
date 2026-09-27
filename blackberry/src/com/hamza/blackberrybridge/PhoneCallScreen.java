@@ -58,6 +58,7 @@ public class PhoneCallScreen extends MainScreen {
     private DarkLabelField statusLabel;
     private DarkLabelField timerLabel;
     private DarkLabelField hardwareStatusBadge;
+    private DarkLabelField audioIndicatorBadge;
     private DarkLabelField volumeBadge;
     
     // Boutons d'action tactiles / trackpad
@@ -87,26 +88,26 @@ public class PhoneCallScreen extends MainScreen {
             getMainManager().setBackground(BackgroundFactory.createSolidBackground(Color.BLACK));
             
             VerticalFieldManager content = new VerticalFieldManager(Field.FIELD_HCENTER);
-            content.setPadding(4, 6, 4, 6);
+            content.setPadding(3, 4, 3, 4);
             
             // 1. En-tête : "Appel en cours - SIM: [nom]" ou "Appel entrant - SIM: [nom]"
             String titleText = isRinging ? ("Appel entrant - SIM: [" + this.simName + "]") : ("Appel en cours - SIM: [" + this.simName + "]");
             setTitle(new LabelField(titleText, Field.FIELD_HCENTER));
             
             headerLabel = new DarkLabelField(titleText, Field.FIELD_HCENTER, isRinging ? 0x00FFCC : 0xFFD700);
-            try { headerLabel.setFont(Font.getDefault().derive(Font.BOLD, 13)); } catch (Throwable ignored) {}
+            try { headerLabel.setFont(Font.getDefault().derive(Font.BOLD, 12)); } catch (Throwable ignored) {}
             content.add(headerLabel);
             
             content.add(new SeparatorField());
             
             // 2. Centre : Nom du contact en grand et en gras
             nameLabel = new DarkLabelField(this.name, Field.FIELD_HCENTER, Color.WHITE);
-            try { nameLabel.setFont(Font.getDefault().derive(Font.BOLD, 19)); } catch (Throwable ignored) {}
+            try { nameLabel.setFont(Font.getDefault().derive(Font.BOLD, 18)); } catch (Throwable ignored) {}
             content.add(nameLabel);
             
             // Numéro de téléphone en dessous
             numberLabel = new DarkLabelField(this.number, Field.FIELD_HCENTER, 0xBBBBBB);
-            try { numberLabel.setFont(Font.getDefault().derive(Font.PLAIN, 13)); } catch (Throwable ignored) {}
+            try { numberLabel.setFont(Font.getDefault().derive(Font.PLAIN, 12)); } catch (Throwable ignored) {}
             content.add(numberLabel);
             
             // 3. Statut en direct et Chronomètre
@@ -119,24 +120,46 @@ public class PhoneCallScreen extends MainScreen {
             try { timerLabel.setFont(Font.getDefault().derive(Font.BOLD, 14)); } catch (Throwable ignored) {}
             content.add(timerLabel);
             
-            // 4. Statut du haut-parleur et du micro : "Haut-parleur : ON | Micro : Actif"
-            hardwareStatusBadge = new DarkLabelField(buildHardwareStatusText(), Field.FIELD_HCENTER, 0x00E5FF);
-            try { hardwareStatusBadge.setFont(Font.getDefault().derive(Font.PLAIN, 11)); } catch (Throwable ignored) {}
+            // 4. Indicateur audio temps réel : "🎧 Audio : BlackBerry Écouteur" dès réception de VOICE_TX
+            audioIndicatorBadge = new DarkLabelField("🎧 Audio : En attente du flux...", Field.FIELD_HCENTER, 0x94A3B8);
+            try { audioIndicatorBadge.setFont(Font.getDefault().derive(Font.BOLD, 11)); } catch (Throwable ignored) {}
+            content.add(audioIndicatorBadge);
+
+            // Statut du haut-parleur et du micro : "Haut-parleur : ON | Micro : Actif"
+            hardwareStatusBadge = new DarkLabelField(buildHardwareStatusText(), Field.FIELD_HCENTER, 0x38BDF8);
+            try { hardwareStatusBadge.setFont(Font.getDefault().derive(Font.PLAIN, 10)); } catch (Throwable ignored) {}
             content.add(hardwareStatusBadge);
             
-            volumeBadge = new DarkLabelField("[Vol Android / BB] (Touches latérales +/-)", Field.FIELD_HCENTER, 0x777777);
+            volumeBadge = new DarkLabelField("[Vol BB: " + AudioQueueWorker.getInstance().getVolume() + "% | Vol +/-]", Field.FIELD_HCENTER, 0x00E5FF);
             try { volumeBadge.setFont(Font.getDefault().derive(Font.PLAIN, 10)); } catch (Throwable ignored) {}
             content.add(volumeBadge);
             
             // Petit espaceur
             VerticalFieldManager sp = new VerticalFieldManager();
-            sp.setPadding(4, 0, 0, 0);
+            sp.setPadding(2, 0, 0, 0);
             content.add(sp);
             
             // 5. Boutons tactiles et navigables au trackpad
             buttonsManager = new HorizontalFieldManager(Field.FIELD_HCENTER);
             rebuildButtons();
             content.add(buttonsManager);
+
+            // Connecter le listener de flux audio pour mise à jour immédiate
+            AudioQueueWorker.getInstance().setAudioStatusListener(new AudioQueueWorker.AudioStatusListener() {
+                public void onAudioPacketReceived(final long packetCount, final boolean isSpeaker) {
+                    UiApplication.getUiApplication().invokeLater(new Runnable() {
+                        public void run() {
+                            try {
+                                if (audioIndicatorBadge != null && !isEnded) {
+                                    String txt = isSpeaker ? "🔊 Audio : BlackBerry Haut-Parleur" : "🎧 Audio : BlackBerry Écouteur";
+                                    audioIndicatorBadge.setText(txt);
+                                    audioIndicatorBadge.setColor(0x00E5FF);
+                                }
+                            } catch (Throwable ignored) {}
+                        }
+                    });
+                }
+            });
             
             // Indication des touches physiques Curve 9300
             String hintText = isRinging ? "(Touche Verte: Décrocher | Touche Rouge: Refuser)" 
@@ -215,8 +238,8 @@ public class PhoneCallScreen extends MainScreen {
                 sp2.setPadding(0, 2, 0, 2);
                 buttonsManager.add(sp2);
                 
-                String spkText = speakerOn ? "HP: ON" : "HP: OFF";
-                btnSpeaker = new StyledButtonField(spkText, speakerOn ? 0x005500 : 0x222222, 0x00AA00, 85, 30);
+                String spkText = speakerOn ? "HP Android: ON" : "HP Android: OFF";
+                btnSpeaker = new StyledButtonField(spkText, speakerOn ? 0x005500 : 0x222222, 0x00AA00, 105, 30);
                 btnSpeaker.setChangeListener(new FieldChangeListener() {
                     public void fieldChanged(Field field, int context) {
                         toggleSpeaker();
@@ -401,6 +424,8 @@ public class PhoneCallScreen extends MainScreen {
      */
     private void hangup() {
         try {
+            AudioQueueWorker.getInstance().stopAudioStream();
+            AudioQueueWorker.getInstance().setAudioStatusListener(null);
             if (isRinging) {
                 callManager.rejectCall(callId);
             } else {
@@ -467,8 +492,10 @@ public class PhoneCallScreen extends MainScreen {
         UiApplication.getUiApplication().invokeLater(new Runnable() {
             public void run() {
                 try {
+                    int vol = AudioQueueWorker.getInstance().getVolume();
                     if (volumeBadge != null) {
-                        volumeBadge.setText("[Volume ajusté]");
+                        volumeBadge.setText("[Vol BB: " + vol + "% | Vol +/-]");
+                        volumeBadge.setColor(0x00E5FF);
                     }
                 } catch (Throwable ignored) {}
             }
@@ -477,6 +504,8 @@ public class PhoneCallScreen extends MainScreen {
     
     public boolean onClose() {
         stopTimer();
+        AudioQueueWorker.getInstance().stopAudioStream();
+        AudioQueueWorker.getInstance().setAudioStatusListener(null);
         return super.onClose();
     }
     
@@ -488,30 +517,34 @@ public class PhoneCallScreen extends MainScreen {
         try {
             int key = Keypad.key(keycode);
             
-            // 1. Touche Rouge native (End/Hangup) ou Échap : Raccrocher immédiatement
+            // 1. Touche Rouge native (End/Hangup) ou Échap : Stoppe l'audio et raccroche immédiatement
             if (key == Keypad.KEY_END || key == Keypad.KEY_ESCAPE) { 
+                AudioQueueWorker.getInstance().stopAudioStream();
                 hangup();
                 return true;
             }
             
-            // 2. Touche Verte native (Send/Call) : Décrocher si appel entrant
+            // 2. Touche Verte native (Send/Call) : Décrocher uniquement si appel entrant
             if (key == Keypad.KEY_SEND) { 
                 if (isRinging) {
                     answer();
                     return true;
                 } else {
-                    toggleSpeaker();
                     return true;
                 }
             }
             
-            // 3. Touches de volume physiques (côté droit du Curve 9300)
+            // 3. Touches de volume physiques (côté droit du Curve 9300) : Règle l'écouteur local ET Android
             if (key == Keypad.KEY_VOLUME_UP) {
+                AudioQueueWorker.getInstance().adjustVolume(5);
                 callManager.volumeUp();
+                updateVolumeDisplay();
                 return true;
             }
             if (key == Keypad.KEY_VOLUME_DOWN) {
+                AudioQueueWorker.getInstance().adjustVolume(-5);
                 callManager.volumeDown();
+                updateVolumeDisplay();
                 return true;
             }
             
