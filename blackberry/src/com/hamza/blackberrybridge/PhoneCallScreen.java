@@ -3,37 +3,53 @@ package com.hamza.blackberrybridge;
 import java.util.Timer;
 import java.util.TimerTask;
 import net.rim.device.api.system.Alert;
+import net.rim.device.api.ui.Color;
+import net.rim.device.api.ui.Field;
+import net.rim.device.api.ui.FieldChangeListener;
+import net.rim.device.api.ui.Font;
 import net.rim.device.api.ui.Keypad;
-import net.rim.device.api.ui.*;
-import net.rim.device.api.ui.component.*;
-import net.rim.device.api.ui.container.*;
-import net.rim.device.api.ui.decor.*;
+import net.rim.device.api.ui.MenuItem;
+import net.rim.device.api.ui.UiApplication;
+import net.rim.device.api.ui.component.LabelField;
+import net.rim.device.api.ui.component.Menu;
+import net.rim.device.api.ui.component.SeparatorField;
+import net.rim.device.api.ui.container.HorizontalFieldManager;
+import net.rim.device.api.ui.container.MainScreen;
+import net.rim.device.api.ui.container.VerticalFieldManager;
+import net.rim.device.api.ui.decor.BackgroundFactory;
 
 /**
- * SmartWatch In-Call Screen (PhoneCallScreen) pour BlackBerry Curve 9300 (OS 5.0 / 6.0).
+ * SmartWatch In-Call Screen (PhoneCallScreen) pour BlackBerry Curve 9300 (RIM OS 5.0 à 7.1).
  * 
- * Interface moderne, fluide et ergonomique optimisée pour l'écran 320x240 :
- * 1. En-tête : "Appel en cours - SIM: [inwi / Orange]" ou "Appel entrant - SIM: [inwi / Orange]"
- * 2. Centre : Nom du contact en grand et en gras, Numéro de téléphone en dessous.
- * 3. Chronomètre en direct : "00:00", incrémenté chaque seconde dès réception de CALL_ACTIVE.
- * 4. Statut matériel en direct : "Haut-parleur : ON/OFF | Micro : Actif/Muet"
+ * Mode SmartWatch Compagnon :
+ * - Le smartphone Android diffuse la voix sur son haut-parleur mains-libres amplifié.
+ * - Le BlackBerry Curve 9300 sert de télécommande complète pour piloter les appels.
  * 
- * Contrôle matériel complet & touches physiques :
- * - Touche Rouge (KEY_END / KEY_ESCAPE) : Envoie CALL_END, bip court et retour écran principal.
- * - Touche Verte (KEY_SEND) : Si appel entrant, décroche immédiatement (CALL_ANSWER).
- * - Touches de volume physiques (côté droit Curve 9300) :
- *   * Volume + (KEY_VOLUME_UP)   -> envoie "VOLUME_UP"
- *   * Volume - (KEY_VOLUME_DOWN) -> envoie "VOLUME_DOWN"
- * - Touche Espace (KEY_SPACE) ou Clic Trackpad sur Mute :
- *   * Envoie "MUTE_TOGGLE" et bascule l'état du micro (Actif / Muet).
- * - Trackpad optique haut/bas : Volume +/-
- * - Menu contextuel BlackBerry : Raccrocher, Mute, Haut-Parleur, Volume.
+ * Spécifications de l'écran 320x240 :
+ * - Titre : "Appel en cours [SIM: inwi / Orange]"
+ * - Corps :
+ *   * Nom du contact en grand (Font Bold 22pt)
+ *   * Numéro en dessous (Font Normal 16pt)
+ *   * Durée : "00:00" incrémentée chaque seconde dès réception de CALL_ACTIVE
+ *   * Statut : "Mains-libres smartphone : ACTIF"
  * 
- * 100% Asynchrone (UiApplication.getUiApplication().invokeLater) & Anti-Exception (try/catch).
+ * Touches physiques du Curve 9300 :
+ * - Touche Fin d'appel (Rouge / KEY_END ou ESCAPE) : Envoie CALL_END, affiche "Fin d'appel..." et ferme l'écran.
+ * - Touches Volume physique (+ / - sur le côté droit) : Envoie "VOLUME_UP" ou "VOLUME_DOWN".
+ * - Touche Espace ou Clic Trackpad : Envoie "MUTE_TOGGLE" pour couper/activer le micro du smartphone.
+ * - Touche M : Envoie "SPEAKER_TOGGLE" pour basculer le haut-parleur du smartphone.
+ * - Touche Verte (KEY_SEND) : Décroche si appel entrant.
+ * 
+ * Gestion de fin d'appel (CALL_END) :
+ * - Arrêter immédiatement le chronomètre d'appel.
+ * - Afficher en rouge au centre de l'écran : "Appel terminé".
+ * - Émettre un bip court de fin d'appel : Alert.startBuzzer(150);
+ * - Fermeture automatique de PhoneCallScreen après 1,5 seconde via Timer et UiApplication.invokeLater.
+ * 
+ * 100% Asynchrone & Protection Anti-Exception intégrale (try / catch Throwable).
  */
 public class PhoneCallScreen extends MainScreen {
     private CallManager callManager;
-    private CallAudioPlayerRecorder audioRecorder;
     private String callId;
     private String name;
     private String number;
@@ -44,7 +60,7 @@ public class PhoneCallScreen extends MainScreen {
     private boolean isEnded = false;
     
     // États matériels du SmartWatch Call Screen
-    private boolean speakerOn = false;
+    private boolean speakerOn = true; // Actif par défaut en mode compagnon mains-libres
     private boolean micMuted = false;
     
     // Chronomètre d'appel (seconde par seconde)
@@ -55,121 +71,108 @@ public class PhoneCallScreen extends MainScreen {
     private DarkLabelField headerLabel;
     private DarkLabelField nameLabel;
     private DarkLabelField numberLabel;
-    private DarkLabelField statusLabel;
     private DarkLabelField timerLabel;
-    private DarkLabelField hardwareStatusBadge;
-    private DarkLabelField audioIndicatorBadge;
-    private DarkLabelField volumeBadge;
+    private DarkLabelField statusLabel;
+    private DarkLabelField microBadge;
+    private DarkLabelField hintLabel;
     
-    // Boutons d'action tactiles / trackpad
-    private StyledButtonField btnHangup;
-    private StyledButtonField btnAnswer;
-    private StyledButtonField btnMute;
-    private StyledButtonField btnSpeaker;
+    // Boutons tactiles / trackpad
     private HorizontalFieldManager buttonsManager;
+    private DarkButtonField btnHangup;
+    private DarkButtonField btnAnswer;
+    private DarkButtonField btnMute;
+    private DarkButtonField btnSpeaker;
 
     public PhoneCallScreen(CallManager cm, String id, String name, String number, String simName, boolean isOutbound) {
         super(MainScreen.VERTICAL_SCROLL | MainScreen.VERTICAL_SCROLLBAR);
-        this.callManager = cm;
-        this.audioRecorder = cm.getApp().getCallAudioPlayerRecorder();
-        this.callId = (id != null && id.length() > 0) ? id : "call_" + System.currentTimeMillis();
-        this.name = (name != null && name.trim().length() > 0) ? name.trim() : "Inconnu";
-        this.number = (number != null && number.trim().length() > 0) ? number.trim() : "";
-        this.simName = (simName != null && simName.trim().length() > 0) ? simName.trim() : "SIM 1";
-        this.isOutbound = isOutbound;
-        this.isRinging = !isOutbound;
-        this.isActive = isOutbound; // Pour un appel sortant, la numérotation commence immédiatement
-        this.isEnded = false;
-        
-        this.speakerOn = cm.isSpeakerOn();
-        this.micMuted = cm.isMicMuted();
-        
         try {
+            this.callManager = cm;
+            this.callId = (id != null && id.length() > 0) ? id : "call_" + System.currentTimeMillis();
+            this.name = (name != null && name.trim().length() > 0) ? name.trim() : "Inconnu";
+            this.number = (number != null && number.trim().length() > 0) ? number.trim() : "";
+            this.simName = (simName != null && simName.trim().length() > 0) ? simName.trim() : "SIM 1";
+            this.isOutbound = isOutbound;
+            this.isRinging = !isOutbound;
+            this.isActive = isOutbound;
+            this.isEnded = false;
+            
+            if (cm != null) {
+                this.speakerOn = cm.isSpeakerOn();
+                this.micMuted = cm.isMicMuted();
+            }
+            
+            // Fond noir profond BlackBerry Curve 9300
             getMainManager().setBackground(BackgroundFactory.createSolidBackground(Color.BLACK));
             
             VerticalFieldManager content = new VerticalFieldManager(Field.FIELD_HCENTER);
-            content.setPadding(3, 4, 3, 4);
+            content.setPadding(4, 6, 4, 6);
             
-            // 1. En-tête : "Appel en cours - SIM: [nom]" ou "Appel entrant - SIM: [nom]"
-            String titleText = isRinging ? ("Appel entrant - SIM: [" + this.simName + "]") : ("Appel en cours - SIM: [" + this.simName + "]");
+            // Titre : "Appel en cours [SIM: inwi / Orange]" ou "Appel entrant [SIM: inwi / Orange]"
+            String titleText = isRinging ? ("Appel entrant [SIM: " + this.simName + "]") 
+                                         : ("Appel en cours [SIM: " + this.simName + "]");
             setTitle(new LabelField(titleText, Field.FIELD_HCENTER));
             
-            headerLabel = new DarkLabelField(titleText, Field.FIELD_HCENTER, isRinging ? 0x00FFCC : 0xFFD700);
-            try { headerLabel.setFont(Font.getDefault().derive(Font.BOLD, 12)); } catch (Throwable ignored) {}
+            headerLabel = new DarkLabelField(titleText, Field.FIELD_HCENTER, isRinging ? 0x00FFCC : 0x00E5FF);
+            try { 
+                headerLabel.setFont(Font.getDefault().derive(Font.BOLD, 12)); 
+            } catch (Throwable ignored) {}
             content.add(headerLabel);
             
             content.add(new SeparatorField());
             
-            // 2. Centre : Nom du contact en grand et en gras
+            // 1. Nom du contact en grand (Font Bold 22pt)
             nameLabel = new DarkLabelField(this.name, Field.FIELD_HCENTER, Color.WHITE);
-            try { nameLabel.setFont(Font.getDefault().derive(Font.BOLD, 18)); } catch (Throwable ignored) {}
+            try { 
+                nameLabel.setFont(Font.getDefault().derive(Font.BOLD, 22)); 
+            } catch (Throwable ignored) {
+                try { nameLabel.setFont(Font.getDefault().derive(Font.BOLD, 18)); } catch (Throwable t2) {}
+            }
             content.add(nameLabel);
             
-            // Numéro de téléphone en dessous
-            numberLabel = new DarkLabelField(this.number, Field.FIELD_HCENTER, 0xBBBBBB);
-            try { numberLabel.setFont(Font.getDefault().derive(Font.PLAIN, 12)); } catch (Throwable ignored) {}
+            // 2. Numéro en dessous (Font Normal 16pt)
+            numberLabel = new DarkLabelField(this.number, Field.FIELD_HCENTER, 0x94A3B8);
+            try { 
+                numberLabel.setFont(Font.getDefault().derive(Font.PLAIN, 16)); 
+            } catch (Throwable ignored) {
+                try { numberLabel.setFont(Font.getDefault().derive(Font.PLAIN, 13)); } catch (Throwable t2) {}
+            }
             content.add(numberLabel);
             
-            // 3. Statut en direct et Chronomètre
-            String initialStatus = isRinging ? "Sonnerie en cours..." : (isOutbound ? "Numérotation en cours..." : "En communication");
-            statusLabel = new DarkLabelField(initialStatus, Field.FIELD_HCENTER, isRinging ? 0x00FFCC : (isOutbound ? 0x00E5FF : 0x00FF00));
-            try { statusLabel.setFont(Font.getDefault().derive(Font.BOLD, 12)); } catch (Throwable ignored) {}
-            content.add(statusLabel);
-            
-            timerLabel = new DarkLabelField(isActive ? "00:00" : "--:--", Field.FIELD_HCENTER, 0x00FF00);
-            try { timerLabel.setFont(Font.getDefault().derive(Font.BOLD, 14)); } catch (Throwable ignored) {}
+            // 3. Durée : "00:00" incrémentée chaque seconde dès réception de CALL_ACTIVE
+            timerLabel = new DarkLabelField(isActive ? "00:00" : "--:--", Field.FIELD_HCENTER, 0x22C55E);
+            try { 
+                timerLabel.setFont(Font.getDefault().derive(Font.BOLD, 18)); 
+            } catch (Throwable ignored) {}
             content.add(timerLabel);
             
-            // 4. Indicateur audio temps réel : "🎧 Audio : BlackBerry Écouteur" dès réception de VOICE_TX
-            audioIndicatorBadge = new DarkLabelField("🎧 Audio : En attente du flux...", Field.FIELD_HCENTER, 0x94A3B8);
-            try { audioIndicatorBadge.setFont(Font.getDefault().derive(Font.BOLD, 11)); } catch (Throwable ignored) {}
-            content.add(audioIndicatorBadge);
-
-            // Statut du haut-parleur et du micro : "Haut-parleur : ON | Micro : Actif"
-            hardwareStatusBadge = new DarkLabelField(buildHardwareStatusText(), Field.FIELD_HCENTER, 0x38BDF8);
-            try { hardwareStatusBadge.setFont(Font.getDefault().derive(Font.PLAIN, 10)); } catch (Throwable ignored) {}
-            content.add(hardwareStatusBadge);
+            // 4. Statut : "Mains-libres smartphone : ACTIF"
+            statusLabel = new DarkLabelField(buildStatusText(), Field.FIELD_HCENTER, 0x00E5FF);
+            try { 
+                statusLabel.setFont(Font.getDefault().derive(Font.BOLD, 13)); 
+            } catch (Throwable ignored) {}
+            content.add(statusLabel);
             
-            volumeBadge = new DarkLabelField("[Vol BB: " + AudioQueueWorker.getInstance().getVolume() + "% | Vol +/-]", Field.FIELD_HCENTER, 0x00E5FF);
-            try { volumeBadge.setFont(Font.getDefault().derive(Font.PLAIN, 10)); } catch (Throwable ignored) {}
-            content.add(volumeBadge);
+            // Indicateur du microphone smartphone
+            microBadge = new DarkLabelField(buildMicroText(), Field.FIELD_HCENTER, micMuted ? 0xF59E0B : 0x38BDF8);
+            try { 
+                microBadge.setFont(Font.getDefault().derive(Font.PLAIN, 11)); 
+            } catch (Throwable ignored) {}
+            content.add(microBadge);
             
-            // Petit espaceur
-            VerticalFieldManager sp = new VerticalFieldManager();
-            sp.setPadding(2, 0, 0, 0);
-            content.add(sp);
-            
-            // 5. Boutons tactiles et navigables au trackpad
+            // Boutons d'action tactiles / trackpad
             buttonsManager = new HorizontalFieldManager(Field.FIELD_HCENTER);
+            buttonsManager.setPadding(4, 0, 2, 0);
             rebuildButtons();
             content.add(buttonsManager);
-
-            // Connecter le listener de flux audio pour mise à jour immédiate
-            AudioQueueWorker.getInstance().setAudioStatusListener(new AudioQueueWorker.AudioStatusListener() {
-                public void onAudioPacketReceived(final long packetCount, final boolean isSpeaker) {
-                    UiApplication.getUiApplication().invokeLater(new Runnable() {
-                        public void run() {
-                            try {
-                                if (audioIndicatorBadge != null && !isEnded) {
-                                    String txt = isSpeaker ? "🔊 Audio : BlackBerry Haut-Parleur" : "🎧 Audio : BlackBerry Écouteur";
-                                    audioIndicatorBadge.setText(txt);
-                                    audioIndicatorBadge.setColor(0x00E5FF);
-                                }
-                            } catch (Throwable ignored) {}
-                        }
-                    });
-                }
-            });
             
-            // Indication des touches physiques Curve 9300
-            String hintText = isRinging ? "(Touche Verte: Décrocher | Touche Rouge: Refuser)" 
-                                        : "(Touche Rouge: Raccrocher | Espace: Mute | Vol +/-)";
-            DarkLabelField hintLabel = new DarkLabelField(hintText, Field.FIELD_HCENTER, 0x555555);
-            try { hintLabel.setFont(Font.getDefault().derive(Font.PLAIN, 9)); } catch (Throwable ignored) {}
-            VerticalFieldManager hintSp = new VerticalFieldManager(Field.FIELD_HCENTER);
-            hintSp.setPadding(3, 0, 0, 0);
-            hintSp.add(hintLabel);
-            content.add(hintSp);
+            // Légende des touches physiques Curve 9300
+            String hints = isRinging ? "[Verte: Décrocher | Rouge: Refuser]" 
+                                     : "[Fin: Rouge | Espace: Mute | M: HP | Vol +/-]";
+            hintLabel = new DarkLabelField(hints, Field.FIELD_HCENTER, 0x64748B);
+            try { 
+                hintLabel.setFont(Font.getDefault().derive(Font.PLAIN, 9)); 
+            } catch (Throwable ignored) {}
+            content.add(hintLabel);
             
             add(content);
             
@@ -177,12 +180,45 @@ public class PhoneCallScreen extends MainScreen {
                 startTimer();
             }
         } catch (Throwable t) {
-            LogManager.error("CALL_SCREEN", "Error initializing PhoneCallScreen: " + t.getMessage());
+            System.out.println("[BB ERROR] " + t.getMessage());
         }
     }
     
-    private String buildHardwareStatusText() {
-        return "Haut-parleur : " + (speakerOn ? "ON" : "OFF") + " | Micro : " + (micMuted ? "Muet" : "Actif");
+    private String buildStatusText() {
+        try {
+            if (isEnded) return "Appel terminé";
+            if (isRinging) return "Sonnerie en cours...";
+            if (isOutbound && !isActive) return "Numérotation en cours...";
+            return speakerOn ? "Mains-libres smartphone : ACTIF" : "Mains-libres smartphone : INACTIF";
+        } catch (Throwable t) {
+            System.out.println("[BB ERROR] " + t.getMessage());
+            return "Mains-libres smartphone : ACTIF";
+        }
+    }
+    
+    private String buildMicroText() {
+        try {
+            if (isEnded) return "";
+            return micMuted ? "Micro smartphone : MUTÉ" : "Micro smartphone : ACTIF";
+        } catch (Throwable t) {
+            System.out.println("[BB ERROR] " + t.getMessage());
+            return "";
+        }
+    }
+    
+    /**
+     * Bip court de notification de fin d'appel (150 ms)
+     */
+    public static void startBuzzer(int ms) {
+        try {
+            if (Alert.isBuzzerSupported()) {
+                Alert.startBuzzer(new short[] { 1000, (short) ms }, 100);
+            } else if (Alert.isAudioSupported()) {
+                Alert.startAudio(new short[] { 1000, (short) ms }, 100);
+            }
+        } catch (Throwable t) {
+            System.out.println("[BB ERROR] " + t.getMessage());
+        }
     }
     
     private void rebuildButtons() {
@@ -191,8 +227,7 @@ public class PhoneCallScreen extends MainScreen {
             if (isEnded) return;
             
             if (isRinging) {
-                // Mode Appel Entrant : Décrocher (Vert) et Refuser (Rouge)
-                btnAnswer = new StyledButtonField("Décrocher", 0x007700, 0x00CC00, 110, 32);
+                btnAnswer = new DarkButtonField("Décrocher", 115, 30, DarkButtonField.STYLE_GREEN);
                 btnAnswer.setChangeListener(new FieldChangeListener() {
                     public void fieldChanged(Field field, int context) {
                         answer();
@@ -204,19 +239,18 @@ public class PhoneCallScreen extends MainScreen {
                 sp.setPadding(0, 4, 0, 4);
                 buttonsManager.add(sp);
                 
-                btnHangup = new StyledButtonField("Refuser", 0x990000, 0xEE2222, 110, 32);
+                btnHangup = new DarkButtonField("Refuser", 115, 30, DarkButtonField.STYLE_RED);
                 btnHangup.setChangeListener(new FieldChangeListener() {
                     public void fieldChanged(Field field, int context) {
-                        hangup();
+                        handlePhysicalHangup();
                     }
                 });
                 buttonsManager.add(btnHangup);
             } else {
-                // Mode En Communication / Sortant : Raccrocher (Rouge), Mute (Bleu/Gris), Haut-Parleur (Gris/Vert)
-                btnHangup = new StyledButtonField("Raccrocher", 0x990000, 0xEE2222, 95, 30);
+                btnHangup = new DarkButtonField("Raccrocher", 95, 28, DarkButtonField.STYLE_RED);
                 btnHangup.setChangeListener(new FieldChangeListener() {
                     public void fieldChanged(Field field, int context) {
-                        hangup();
+                        handlePhysicalHangup();
                     }
                 });
                 buttonsManager.add(btnHangup);
@@ -225,8 +259,8 @@ public class PhoneCallScreen extends MainScreen {
                 sp1.setPadding(0, 2, 0, 2);
                 buttonsManager.add(sp1);
                 
-                String muteText = micMuted ? "Micro: OFF" : "Micro: ON";
-                btnMute = new StyledButtonField(muteText, micMuted ? 0x773300 : 0x223344, 0xCC5500, 95, 30);
+                String muteLabel = micMuted ? "Micro: OFF" : "Micro: ON";
+                btnMute = new DarkButtonField(muteLabel, 95, 28, micMuted ? DarkButtonField.STYLE_GOLD : DarkButtonField.STYLE_SLATE);
                 btnMute.setChangeListener(new FieldChangeListener() {
                     public void fieldChanged(Field field, int context) {
                         toggleMute();
@@ -238,8 +272,8 @@ public class PhoneCallScreen extends MainScreen {
                 sp2.setPadding(0, 2, 0, 2);
                 buttonsManager.add(sp2);
                 
-                String spkText = speakerOn ? "HP Android: ON" : "HP Android: OFF";
-                btnSpeaker = new StyledButtonField(spkText, speakerOn ? 0x005500 : 0x222222, 0x00AA00, 105, 30);
+                String spkLabel = speakerOn ? "HP: ON" : "HP: OFF";
+                btnSpeaker = new DarkButtonField(spkLabel, 105, 28, speakerOn ? DarkButtonField.STYLE_CYAN : DarkButtonField.STYLE_SLATE);
                 btnSpeaker.setChangeListener(new FieldChangeListener() {
                     public void fieldChanged(Field field, int context) {
                         toggleSpeaker();
@@ -248,7 +282,7 @@ public class PhoneCallScreen extends MainScreen {
                 buttonsManager.add(btnSpeaker);
             }
         } catch (Throwable t) {
-            LogManager.error("CALL_SCREEN", "Error in rebuildButtons: " + t.getMessage());
+            System.out.println("[BB ERROR] " + t.getMessage());
         }
     }
     
@@ -268,11 +302,13 @@ public class PhoneCallScreen extends MainScreen {
                                 }
                             });
                         }
-                    } catch (Throwable ignored) {}
+                    } catch (Throwable t) {
+                        System.out.println("[BB ERROR] " + t.getMessage());
+                    }
                 }
             }, 1000, 1000);
         } catch (Throwable t) {
-            LogManager.error("CALL_SCREEN", "Error starting timer: " + t.getMessage());
+            System.out.println("[BB ERROR] " + t.getMessage());
         }
     }
     
@@ -282,7 +318,9 @@ public class PhoneCallScreen extends MainScreen {
                 callTimer.cancel();
                 callTimer = null;
             }
-        } catch (Throwable ignored) {}
+        } catch (Throwable t) {
+            System.out.println("[BB ERROR] " + t.getMessage());
+        }
     }
     
     private void updateDurationDisplay() {
@@ -292,12 +330,10 @@ public class PhoneCallScreen extends MainScreen {
                 int s = durationSeconds % 60;
                 String timeStr = (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
                 timerLabel.setText(timeStr);
-                if (statusLabel != null) {
-                    statusLabel.setText("En communication (" + timeStr + ")");
-                    statusLabel.setColor(0x00FF00); // Lime green
-                }
             }
-        } catch (Throwable ignored) {}
+        } catch (Throwable t) {
+            System.out.println("[BB ERROR] " + t.getMessage());
+        }
     }
     
     /**
@@ -308,33 +344,40 @@ public class PhoneCallScreen extends MainScreen {
             if (isRinging) {
                 isRinging = false;
                 isActive = true;
-                callManager.answerCall(callId);
+                if (callManager != null) {
+                    callManager.answerCall(callId);
+                }
                 
                 UiApplication.getUiApplication().invokeLater(new Runnable() {
                     public void run() {
                         try {
                             if (headerLabel != null) {
-                                headerLabel.setText("Appel en cours - SIM: [" + simName + "]");
-                                headerLabel.setColor(0xFFD700);
+                                headerLabel.setText("Appel en cours [SIM: " + simName + "]");
+                                headerLabel.setColor(0x00E5FF);
                             }
                             if (statusLabel != null) {
-                                statusLabel.setText("En communication");
-                                statusLabel.setColor(0x00FF00);
+                                statusLabel.setText(buildStatusText());
+                                statusLabel.setColor(0x00E5FF);
                             }
                             if (timerLabel != null) {
                                 timerLabel.setText("00:00");
                             }
                             rebuildButtons();
-                        } catch (Throwable ignored) {}
+                        } catch (Throwable t) {
+                            System.out.println("[BB ERROR] " + t.getMessage());
+                        }
                     }
                 });
                 startTimer();
             }
         } catch (Throwable t) {
-            LogManager.error("CALL_SCREEN", "Error in answer: " + t.getMessage());
+            System.out.println("[BB ERROR] " + t.getMessage());
         }
     }
     
+    /**
+     * Reçoit CALL_ACTIVE de Android : active le chronomètre et l'affichage.
+     */
     public void setCallActive(final String simOverride) {
         try {
             this.isActive = true;
@@ -347,250 +390,367 @@ public class PhoneCallScreen extends MainScreen {
                 public void run() {
                     try {
                         if (headerLabel != null) {
-                            headerLabel.setText("Appel en cours - SIM: [" + simName + "]");
-                            headerLabel.setColor(0xFFD700);
+                            headerLabel.setText("Appel en cours [SIM: " + simName + "]");
+                            headerLabel.setColor(0x00E5FF);
                         }
                         if (statusLabel != null) {
-                            statusLabel.setText("En communication");
-                            statusLabel.setColor(0x00FF00);
+                            statusLabel.setText(buildStatusText());
+                            statusLabel.setColor(0x00E5FF);
+                        }
+                        if (microBadge != null) {
+                            microBadge.setText(buildMicroText());
                         }
                         rebuildButtons();
                         updateDurationDisplay();
-                    } catch (Throwable ignored) {}
+                    } catch (Throwable t) {
+                        System.out.println("[BB ERROR] " + t.getMessage());
+                    }
                 }
             });
             startTimer();
         } catch (Throwable t) {
-            LogManager.error("CALL_SCREEN", "Error in setCallActive: " + t.getMessage());
+            System.out.println("[BB ERROR] " + t.getMessage());
         }
     }
     
+    /**
+     * Fin d'appel (CALL_END reçu ou déclenché) :
+     * 1. Arrêter immédiatement le chronomètre d'appel.
+     * 2. Afficher en rouge au centre de l'écran : "Appel terminé".
+     * 3. Émettre un bip court de fin d'appel : Alert.startBuzzer(150);
+     * 4. Programmer la fermeture automatique de PhoneCallScreen après 1,5 seconde.
+     */
     public void setCallEnded() {
         try {
             if (isEnded) return;
             this.isEnded = true;
             this.isActive = false;
             this.isRinging = false;
+            
+            // 1. Arrêter immédiatement le chronomètre d'appel
             stopTimer();
             
-            // Émettre un bip court de fin d'appel sur le BlackBerry Curve
-            try {
-                Alert.startAudio(new short[] { 800, 100 }, 75);
-            } catch (Throwable ignored) {}
+            // 2. Émettre un bip court de fin d'appel : Alert.startBuzzer(150);
+            startBuzzer(150);
             
+            // 3. Afficher en rouge au centre de l'écran : "Appel terminé"
             UiApplication.getUiApplication().invokeLater(new Runnable() {
                 public void run() {
                     try {
+                        if (statusLabel != null) {
+                            statusLabel.setText("Appel terminé");
+                            statusLabel.setColor(0xFF2222); // Rouge vif
+                        }
                         if (headerLabel != null) {
                             headerLabel.setText("APPEL TERMINÉ");
-                            headerLabel.setColor(0xFF3333);
+                            headerLabel.setColor(0xFF2222);
                         }
-                        if (statusLabel != null) {
+                        if (timerLabel != null) {
                             int m = durationSeconds / 60;
                             int s = durationSeconds % 60;
                             String timeStr = (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
-                            statusLabel.setText("Appel terminé (" + timeStr + ")");
-                            statusLabel.setColor(0xFF8888);
+                            timerLabel.setText(timeStr);
+                            timerLabel.setColor(0xFF6666);
+                        }
+                        if (microBadge != null) {
+                            microBadge.setText("Déconnexion...");
+                            microBadge.setColor(0x888888);
                         }
                         rebuildButtons();
-                    } catch (Throwable ignored) {}
+                    } catch (Throwable t) {
+                        System.out.println("[BB ERROR] " + t.getMessage());
+                    }
                 }
             });
             
-            // Fermeture automatique au bout de 1,5 seconde
-            new Thread(new Runnable() {
+            // 4. Programmer la fermeture automatique de PhoneCallScreen après 1,5 seconde
+            Timer closeTimer = new Timer();
+            closeTimer.schedule(new TimerTask() {
                 public void run() {
-                    try { 
-                        Thread.sleep(1500); 
-                    } catch (Throwable ignored) {}
-                    
                     UiApplication.getUiApplication().invokeLater(new Runnable() {
                         public void run() {
-                            try { 
-                                close(); 
-                            } catch (Throwable ignored) {}
+                            try {
+                                UiApplication.getUiApplication().popScreen(PhoneCallScreen.this);
+                            } catch (Throwable t) {
+                                try { close(); } catch (Throwable ignored) {}
+                                System.out.println("[BB ERROR] " + t.getMessage());
+                            }
                         }
                     });
                 }
-            }).start();
+            }, 1500);
         } catch (Throwable t) {
-            LogManager.error("CALL_SCREEN", "Error in setCallEnded: " + t.getMessage());
+            System.out.println("[BB ERROR] " + t.getMessage());
         }
     }
     
     /**
-     * Raccrocher l'appel (Touche Rouge native / bouton Raccrocher)
-     * Envoie immédiatement "CALL_END" et ferme l'écran.
+     * Touche Fin d'appel physique (Rouge / KEY_END) :
+     * Envoie le paquet Bluetooth "CALL_END", affiche "Fin d'appel..." et ferme l'écran.
      */
-    private void hangup() {
+    private void handlePhysicalHangup() {
         try {
-            AudioQueueWorker.getInstance().stopAudioStream();
-            AudioQueueWorker.getInstance().setAudioStatusListener(null);
+            UiApplication.getUiApplication().invokeLater(new Runnable() {
+                public void run() {
+                    try {
+                        if (statusLabel != null) {
+                            statusLabel.setText("Fin d'appel...");
+                            statusLabel.setColor(0xFF3333);
+                        }
+                    } catch (Throwable t) {
+                        System.out.println("[BB ERROR] " + t.getMessage());
+                    }
+                }
+            });
+            
             if (isRinging) {
-                callManager.rejectCall(callId);
+                if (callManager != null) callManager.rejectCall(callId);
             } else {
-                callManager.endCurrentCall();
+                if (callManager != null) callManager.endCurrentCall();
             }
+            
             setCallEnded();
         } catch (Throwable t) {
-            LogManager.error("CALL_SCREEN", "Error in hangup: " + t.getMessage());
+            System.out.println("[BB ERROR] " + t.getMessage());
         }
     }
     
     /**
-     * Bascule le mode muet (MUTE_TOGGLE)
+     * Touche Espace ou Clic Trackpad : Envoie "MUTE_TOGGLE"
      */
     public void toggleMute() {
         try {
-            callManager.toggleMute();
+            if (callManager != null) {
+                callManager.toggleMute();
+            }
         } catch (Throwable t) {
-            LogManager.error("CALL_SCREEN", "Error toggling mute: " + t.getMessage());
+            System.out.println("[BB ERROR] " + t.getMessage());
         }
     }
     
     public void updateMicStatus(final boolean isMuted) {
-        this.micMuted = isMuted;
-        UiApplication.getUiApplication().invokeLater(new Runnable() {
-            public void run() {
-                try {
-                    if (hardwareStatusBadge != null) {
-                        hardwareStatusBadge.setText(buildHardwareStatusText());
-                        hardwareStatusBadge.setColor(micMuted ? 0xFF8800 : 0x00E5FF);
+        try {
+            this.micMuted = isMuted;
+            UiApplication.getUiApplication().invokeLater(new Runnable() {
+                public void run() {
+                    try {
+                        if (microBadge != null && !isEnded) {
+                            microBadge.setText(buildMicroText());
+                            microBadge.setColor(micMuted ? 0xF59E0B : 0x38BDF8);
+                        }
+                        rebuildButtons();
+                    } catch (Throwable t) {
+                        System.out.println("[BB ERROR] " + t.getMessage());
                     }
-                    rebuildButtons();
-                } catch (Throwable ignored) {}
-            }
-        });
+                }
+            });
+        } catch (Throwable t) {
+            System.out.println("[BB ERROR] " + t.getMessage());
+        }
     }
     
     /**
-     * Bascule le haut-parleur (SPEAKER_TOGGLE)
+     * Touche M : Envoie "SPEAKER_TOGGLE" pour basculer le haut-parleur du smartphone
      */
     public void toggleSpeaker() {
         try {
-            callManager.toggleSpeaker();
+            if (callManager != null) {
+                callManager.toggleSpeaker();
+            }
         } catch (Throwable t) {
-            LogManager.error("CALL_SCREEN", "Error toggling speaker: " + t.getMessage());
+            System.out.println("[BB ERROR] " + t.getMessage());
         }
     }
     
     public void updateSpeakerStatus(final boolean isSpeaker) {
-        this.speakerOn = isSpeaker;
-        UiApplication.getUiApplication().invokeLater(new Runnable() {
-            public void run() {
-                try {
-                    if (hardwareStatusBadge != null) {
-                        hardwareStatusBadge.setText(buildHardwareStatusText());
+        try {
+            this.speakerOn = isSpeaker;
+            UiApplication.getUiApplication().invokeLater(new Runnable() {
+                public void run() {
+                    try {
+                        if (statusLabel != null && !isEnded) {
+                            statusLabel.setText(buildStatusText());
+                        }
+                        rebuildButtons();
+                    } catch (Throwable t) {
+                        System.out.println("[BB ERROR] " + t.getMessage());
                     }
-                    rebuildButtons();
-                } catch (Throwable ignored) {}
+                }
+            });
+        } catch (Throwable t) {
+            System.out.println("[BB ERROR] " + t.getMessage());
+        }
+    }
+    
+    /**
+     * Touches Volume physique (+ / - sur le côté droit) : Envoie VOLUME_UP / VOLUME_DOWN
+     */
+    public void sendVolumeUp() {
+        try {
+            if (callManager != null) {
+                callManager.volumeUp();
             }
-        });
+        } catch (Throwable t) {
+            System.out.println("[BB ERROR] " + t.getMessage());
+        }
+    }
+    
+    public void sendVolumeDown() {
+        try {
+            if (callManager != null) {
+                callManager.volumeDown();
+            }
+        } catch (Throwable t) {
+            System.out.println("[BB ERROR] " + t.getMessage());
+        }
     }
     
     public void updateVolumeDisplay() {
-        UiApplication.getUiApplication().invokeLater(new Runnable() {
-            public void run() {
-                try {
-                    int vol = AudioQueueWorker.getInstance().getVolume();
-                    if (volumeBadge != null) {
-                        volumeBadge.setText("[Vol BB: " + vol + "% | Vol +/-]");
-                        volumeBadge.setColor(0x00E5FF);
+        try {
+            UiApplication.getUiApplication().invokeLater(new Runnable() {
+                public void run() {
+                    try {
+                        if (hintLabel != null && !isEnded) {
+                            hintLabel.setText("[Volume ajusté sur Smartphone]");
+                            hintLabel.setColor(0x00E5FF);
+                        }
+                    } catch (Throwable t) {
+                        System.out.println("[BB ERROR] " + t.getMessage());
                     }
-                } catch (Throwable ignored) {}
-            }
-        });
+                }
+            });
+        } catch (Throwable t) {
+            System.out.println("[BB ERROR] " + t.getMessage());
+        }
     }
     
     public boolean onClose() {
-        stopTimer();
-        AudioQueueWorker.getInstance().stopAudioStream();
-        AudioQueueWorker.getInstance().setAudioStatusListener(null);
+        try {
+            stopTimer();
+        } catch (Throwable t) {
+            System.out.println("[BB ERROR] " + t.getMessage());
+        }
         return super.onClose();
     }
     
     // =========================================================================
-    // Gestion des touches physiques Curve 9300 & Molette / Trackpad optique
+    // Gestion des touches physiques Curve 9300 & Trackpad optique
     // =========================================================================
     
     protected boolean keyDown(int keycode, int time) {
         try {
             int key = Keypad.key(keycode);
             
-            // 1. Touche Rouge native (End/Hangup) ou Échap : Stoppe l'audio et raccroche immédiatement
+            // 1. Touche Fin d'appel (Rouge / KEY_END ou ESCAPE) : Envoie CALL_END, affiche "Fin d'appel..." et ferme l'écran
             if (key == Keypad.KEY_END || key == Keypad.KEY_ESCAPE) { 
-                AudioQueueWorker.getInstance().stopAudioStream();
-                hangup();
+                handlePhysicalHangup();
                 return true;
             }
             
-            // 2. Touche Verte native (Send/Call) : Décrocher uniquement si appel entrant
+            // 2. Touche Verte (KEY_SEND) : Décroche si appel entrant
             if (key == Keypad.KEY_SEND) { 
                 if (isRinging) {
                     answer();
                     return true;
-                } else {
-                    return true;
                 }
+                return true;
             }
             
-            // 3. Touches de volume physiques (côté droit du Curve 9300) : Règle l'écouteur local ET Android
+            // 3. Touches Volume physique (+ / - sur le côté droit) : Envoie VOLUME_UP ou VOLUME_DOWN
             if (key == Keypad.KEY_VOLUME_UP) {
-                AudioQueueWorker.getInstance().adjustVolume(5);
-                callManager.volumeUp();
-                updateVolumeDisplay();
+                sendVolumeUp();
                 return true;
             }
             if (key == Keypad.KEY_VOLUME_DOWN) {
-                AudioQueueWorker.getInstance().adjustVolume(-5);
-                callManager.volumeDown();
-                updateVolumeDisplay();
+                sendVolumeDown();
                 return true;
             }
             
-            // 4. Touche Espace : Coupe / Réactive le micro à distance (MUTE_TOGGLE)
+            // 4. Touche Espace : Envoie MUTE_TOGGLE
             if (key == Keypad.KEY_SPACE) {
                 toggleMute();
                 return true;
             }
+            
+            // 5. Touche Haut-parleur physique (si présente)
+            if (key == Keypad.KEY_SPEAKERPHONE) {
+                toggleSpeaker();
+                return true;
+            }
         } catch (Throwable t) {
-            LogManager.error("CALL_SCREEN", "Error in keyDown: " + t.getMessage());
+            System.out.println("[BB ERROR] " + t.getMessage());
         }
         return super.keyDown(keycode, time);
     }
     
-    /**
-     * Déplacement sur le Trackpad optique pour ajuster le volume audio (Volume +/-)
-     */
-    protected boolean navigationMovement(int dx, int dy, int status, int time) {
+    protected boolean keyChar(char ch, int status, int time) {
         try {
-            if (dy < 0) { // Glissement vers le haut -> Volume +
-                callManager.volumeUp();
+            // Touche M : Envoie SPEAKER_TOGGLE pour basculer le haut-parleur
+            if (ch == 'm' || ch == 'M') {
+                toggleSpeaker();
                 return true;
-            } else if (dy > 0) { // Glissement vers le bas -> Volume -
-                callManager.volumeDown();
+            }
+            // Touche Espace : Envoie MUTE_TOGGLE
+            if (ch == ' ') {
+                toggleMute();
                 return true;
             }
         } catch (Throwable t) {
-            LogManager.error("CALL_SCREEN", "Error in navigationMovement: " + t.getMessage());
+            System.out.println("[BB ERROR] " + t.getMessage());
+        }
+        return super.keyChar(ch, status, time);
+    }
+    
+    /**
+     * Clic Trackpad optique : Envoie MUTE_TOGGLE (ou actionne le bouton sélectionné)
+     */
+    protected boolean navigationClick(int status, int time) {
+        try {
+            Field focus = getLeafFieldWithFocus();
+            if (focus instanceof DarkButtonField) {
+                return super.navigationClick(status, time);
+            }
+            toggleMute();
+            return true;
+        } catch (Throwable t) {
+            System.out.println("[BB ERROR] " + t.getMessage());
+        }
+        return super.navigationClick(status, time);
+    }
+    
+    /**
+     * Déplacement sur le Trackpad optique (Haut/Bas) : Envoie VOLUME_UP / VOLUME_DOWN
+     */
+    protected boolean navigationMovement(int dx, int dy, int status, int time) {
+        try {
+            Field focus = getLeafFieldWithFocus();
+            if (focus instanceof DarkButtonField) {
+                return super.navigationMovement(dx, dy, status, time);
+            }
+            if (dy < 0) {
+                sendVolumeUp();
+                return true;
+            } else if (dy > 0) {
+                sendVolumeDown();
+                return true;
+            }
+        } catch (Throwable t) {
+            System.out.println("[BB ERROR] " + t.getMessage());
         }
         return super.navigationMovement(dx, dy, status, time);
     }
     
-    /**
-     * Molette physique (Trackwheel / Trackball)
-     */
     protected boolean trackwheelRoll(int amount, int status, int time) {
         try {
             if (amount > 0) {
-                callManager.volumeUp();
+                sendVolumeUp();
                 return true;
             } else if (amount < 0) {
-                callManager.volumeDown();
+                sendVolumeDown();
                 return true;
             }
         } catch (Throwable t) {
-            LogManager.error("CALL_SCREEN", "Error in trackwheelRoll: " + t.getMessage());
+            System.out.println("[BB ERROR] " + t.getMessage());
         }
         return super.trackwheelRoll(amount, status, time);
     }
@@ -603,88 +763,27 @@ public class PhoneCallScreen extends MainScreen {
                     public void run() { answer(); }
                 });
                 menu.add(new MenuItem("Refuser (Touche Rouge)", 100, 20) {
-                    public void run() { hangup(); }
+                    public void run() { handlePhysicalHangup(); }
                 });
             } else {
-                menu.add(new MenuItem("Raccrocher", 100, 10) {
-                    public void run() { hangup(); }
+                menu.add(new MenuItem("Raccrocher (Touche Rouge)", 100, 10) {
+                    public void run() { handlePhysicalHangup(); }
                 });
-                menu.add(new MenuItem("Couper / Réactiver Micro", 100, 20) {
+                menu.add(new MenuItem("Couper / Réactiver Micro (Espace)", 100, 20) {
                     public void run() { toggleMute(); }
                 });
-                menu.add(new MenuItem("Basculer Haut-Parleur", 100, 30) {
+                menu.add(new MenuItem("Haut-Parleur Smartphone (Touche M)", 100, 30) {
                     public void run() { toggleSpeaker(); }
                 });
-                menu.add(new MenuItem("Volume +", 100, 40) {
-                    public void run() { callManager.volumeUp(); }
+                menu.add(new MenuItem("Volume + (Côté droit)", 100, 40) {
+                    public void run() { sendVolumeUp(); }
                 });
-                menu.add(new MenuItem("Volume -", 100, 41) {
-                    public void run() { callManager.volumeDown(); }
+                menu.add(new MenuItem("Volume - (Côté droit)", 100, 41) {
+                    public void run() { sendVolumeDown(); }
                 });
             }
         } catch (Throwable t) {
-            LogManager.error("CALL_SCREEN", "Error in makeMenu: " + t.getMessage());
-        }
-    }
-    
-    // --- Composant bouton stylisé ---
-    private static class StyledButtonField extends Field {
-        private String label;
-        private int bgColor;
-        private int focusColor;
-        private int width, height;
-
-        public StyledButtonField(String label, int bgColor, int focusColor, int width, int height) {
-            super(FOCUSABLE);
-            this.label = label;
-            this.bgColor = bgColor;
-            this.focusColor = focusColor;
-            this.width = width;
-            this.height = height;
-        }
-        
-        public int getPreferredWidth() { return width; }
-        public int getPreferredHeight() { return height; }
-        
-        protected void layout(int width, int height) {
-            setExtent(getPreferredWidth(), getPreferredHeight());
-        }
-        
-        protected void paint(Graphics graphics) {
-            try {
-                boolean focused = isFocus();
-                graphics.setColor(focused ? focusColor : bgColor);
-                graphics.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
-                graphics.setColor(focused ? 0xFFFFFF : 0x555555);
-                graphics.drawRoundRect(1, 1, getWidth()-2, getHeight()-2, 8, 8);
-                graphics.setColor(focused ? Color.BLACK : Color.WHITE);
-                Font f = graphics.getFont();
-                try { 
-                    f = Font.getDefault().derive(Font.BOLD, 12); 
-                    graphics.setFont(f); 
-                } catch (Throwable ignored) {}
-                int tx = (getWidth() - f.getAdvance(label)) / 2;
-                int ty = (getHeight() - f.getHeight()) / 2;
-                graphics.drawText(label, tx, ty);
-            } catch (Throwable ignored) {}
-        }
-        
-        protected boolean navigationClick(int status, int time) {
-            fieldChangeNotify(0);
-            return true;
-        }
-        
-        protected boolean trackwheelClick(int status, int time) {
-            fieldChangeNotify(0);
-            return true;
-        }
-        
-        protected boolean invokeAction(int action) {
-            if (action == ACTION_INVOKE) {
-                fieldChangeNotify(0);
-                return true;
-            }
-            return super.invokeAction(action);
+            System.out.println("[BB ERROR] " + t.getMessage());
         }
     }
 }

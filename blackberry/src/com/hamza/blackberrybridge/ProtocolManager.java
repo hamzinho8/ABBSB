@@ -18,49 +18,12 @@ public class ProtocolManager {
     public void processMessage(String message) {
         if (message == null || message.length() == 0) return;
         
-        // 1. Détection ultra-rapide des commandes audio de streaming temps réel
-        // Contourne split() et LogManager pour éliminer le GC thrashing et la latence
-        if (message.startsWith("VOICE_START")) {
-            int rate = 8000;
-            int channels = 1;
-            int bits = 16;
-            String[] vparts = split(message, '|');
-            if (vparts.length >= 2) {
-                try { rate = Integer.parseInt(vparts[1].trim()); } catch (Exception ignored) {}
-            }
-            if (vparts.length >= 3) {
-                try { channels = Integer.parseInt(vparts[2].trim()); } catch (Exception ignored) {}
-            }
-            if (vparts.length >= 4) {
-                try { bits = Integer.parseInt(vparts[3].trim()); } catch (Exception ignored) {}
-            }
-            StreamingAudioPlayer.getInstance().startAudioStream(rate, channels, bits);
-            return;
-        }
-
-        if (message.startsWith("VOICE_TX|")) {
-            String base64Data = message.substring(9);
-            StreamingAudioPlayer.getInstance().writeChunk(base64Data);
-            return;
-        }
-
-        if (message.equals("VOICE_STOP")) {
-            StreamingAudioPlayer.getInstance().stopAudioStream();
-            return;
-        }
-        
-        // Traitement ultra-rapide des flux audio entrants sans allocation (25 paquets/sec)
-        if (message.startsWith("VOICE_TX|")) {
-            String b64 = message.substring(9);
-            AudioQueueWorker.getInstance().enqueueBase64(b64);
-            return;
-        }
-        if (message.startsWith("VOICE_START")) {
-            AudioQueueWorker.getInstance().startAudioStream(8000, 1, 16);
-            return;
-        }
-        if (message.startsWith("VOICE_STOP")) {
-            AudioQueueWorker.getInstance().stopAudioStream();
+        // DÉCOUPLAGE ABSOLU THREAD BLUETOOTH / THREAD UI (ANTI-CRASH 226) :
+        // Si un paquet commence par "VOICE_TX|" ou "VOICE_START", l'ignorer silencieusement immédiatement (return;)
+        // pour ne pas saturer le processeur du BlackBerry Curve 9300 ni bloquer la boucle Bluetooth.
+        if (message.startsWith("VOICE_TX|") || message.startsWith("VOICE_START") ||
+            message.startsWith("VOICE_STOP") || message.startsWith("VOICE_RX|") ||
+            message.startsWith("VOICE_BRIDGE")) {
             return;
         }
 
@@ -133,12 +96,10 @@ public class ProtocolManager {
             else if (command.equals("CALL_ACTIVE")) {
                 String id = (parts.length >= 2) ? parts[1] : "";
                 String sim = (parts.length >= 3) ? parts[2] : null;
-                AudioQueueWorker.getInstance().startAudioStream(8000, 1, 16);
                 app.getCallManager().handleCallActive(id, sim);
             }
             else if (command.equals("CALL_END")) {
                 String id = (parts.length >= 2) ? parts[1] : "";
-                AudioQueueWorker.getInstance().stopAudioStream();
                 app.getCallManager().handleCallEnd(id);
             }
             else if (command.equals("CALL_MISSED")) {
@@ -152,15 +113,13 @@ public class ProtocolManager {
                 String status = (parts.length >= 2) ? parts[1] : "OFF";
                 app.getCallManager().handleMuteStatus(status);
             }
+            else if (command.equals("VOLUME_OK")) {
+                String dir = (parts.length >= 2) ? parts[1] : "";
+                app.getCallManager().handleVolumeOk(dir);
+            }
             else if (command.equals("AUDIO_STATUS") || command.equals("AUDIO_ROUTE")) {
                 String route = (parts.length >= 2) ? parts[1] : "BLUETOOTH";
                 app.getCallManager().handleAudioStatus(route);
-            }
-            else if (command.equals("VOICE_BRIDGE_START")) {
-                app.getCallAudioPlayerRecorder().startVoiceBridge();
-            }
-            else if (command.equals("VOICE_BRIDGE_STOP")) {
-                app.getCallAudioPlayerRecorder().stopVoiceBridge();
             }
             else if (command.equals("CONTACTS_CLEAR")) {
                 app.getContactManager().clearContacts();

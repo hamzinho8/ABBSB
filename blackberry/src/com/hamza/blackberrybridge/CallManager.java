@@ -127,20 +127,21 @@ public class CallManager {
         phoneCallScreen = new PhoneCallScreen(this, "outbound_" + System.currentTimeMillis(), displayName, number, simName != null ? simName : "", true);
         uiManager.pushScreen(phoneCallScreen);
         
-        // Démarrer le streaming audio bidirectionnel dès l'envoi de l'appel
-        app.getCallAudioPlayerRecorder().startVoiceBridge();
-        
         // Envoi réseau sur un thread en arrière-plan
         new Thread(new Runnable() {
             public void run() {
-                String packet;
-                if (slot >= 0) {
-                    packet = "CALL_OUTBOUND|" + number + "|" + slot + "\n";
-                } else {
-                    packet = "CALL_OUTBOUND|" + number + "\n";
+                try {
+                    String packet;
+                    if (slot >= 0) {
+                        packet = "CALL_OUTBOUND|" + number + "|" + slot + "\n";
+                    } else {
+                        packet = "CALL_OUTBOUND|" + number + "\n";
+                    }
+                    LogManager.log("CALL", "Sending outbound call: " + packet.trim());
+                    app.getConnectionManager().sendData(packet);
+                } catch (Throwable t) {
+                    System.out.println("[BB ERROR] " + t.getMessage());
                 }
-                LogManager.log("CALL", "Sending outbound call: " + packet.trim());
-                app.getConnectionManager().sendData(packet);
             }
         }).start();
     }
@@ -207,51 +208,59 @@ public class CallManager {
     }
     
     public void handleCallActive(final String id, final String simName) {
-        activeCallId = id;
-        callInProgress = true;
-        HardwareManager.stopAlerts();
-        app.getAudioManager().stopCallRingtone();
-        app.getAudioManager().playCallConnectBeep();
-        
-        // Démarrer la capture et la lecture audio temps réel
-        app.getCallAudioPlayerRecorder().startVoiceBridge();
-        
-        UiApplication.getUiApplication().invokeLater(new Runnable() {
-            public void run() {
-                if (phoneCallScreen != null) {
-                    phoneCallScreen.setCallActive(simName);
+        try {
+            activeCallId = id;
+            callInProgress = true;
+            HardwareManager.stopAlerts();
+            app.getAudioManager().stopCallRingtone();
+            app.getAudioManager().playCallConnectBeep();
+            
+            UiApplication.getUiApplication().invokeLater(new Runnable() {
+                public void run() {
+                    try {
+                        if (phoneCallScreen != null) {
+                            phoneCallScreen.setCallActive(simName);
+                        }
+                        if (activeCallScreen != null) {
+                            activeCallScreen.setCallActive(simName);
+                            activeCallScreen.updateAudioRoute(currentAudioRoute);
+                        }
+                    } catch (Throwable t) {
+                        System.out.println("[BB ERROR] " + t.getMessage());
+                    }
                 }
-                if (activeCallScreen != null) {
-                    activeCallScreen.setCallActive(simName);
-                    activeCallScreen.updateAudioRoute(currentAudioRoute);
-                }
-            }
-        });
+            });
+        } catch (Throwable t) {
+            System.out.println("[BB ERROR] " + t.getMessage());
+        }
     }
     
     public void handleCallEnd(final String id) {
-        callInProgress = false;
-        activeCallId = null;
-        speakerOn = false;
-        HardwareManager.stopAlerts();
-        app.getAudioManager().stopCallRingtone();
-        app.getAudioManager().playCallEndBeep();
-        
-        // Arrêter immédiatement le pont audio
-        app.getCallAudioPlayerRecorder().stopVoiceBridge();
-        
-        UiApplication.getUiApplication().invokeLater(new Runnable() {
-            public void run() {
-                if (phoneCallScreen != null) {
-                    phoneCallScreen.setCallEnded();
-                    phoneCallScreen = null;
+        try {
+            callInProgress = false;
+            activeCallId = null;
+            speakerOn = false;
+            HardwareManager.stopAlerts();
+            app.getAudioManager().stopCallRingtone();
+            
+            UiApplication.getUiApplication().invokeLater(new Runnable() {
+                public void run() {
+                    try {
+                        if (phoneCallScreen != null) {
+                            phoneCallScreen.setCallEnded();
+                        }
+                        if (activeCallScreen != null) {
+                            activeCallScreen.setCallEnded();
+                            activeCallScreen = null;
+                        }
+                    } catch (Throwable t) {
+                        System.out.println("[BB ERROR] " + t.getMessage());
+                    }
                 }
-                if (activeCallScreen != null) {
-                    activeCallScreen.setCallEnded();
-                    activeCallScreen = null;
-                }
-            }
-        });
+            });
+        } catch (Throwable t) {
+            System.out.println("[BB ERROR] " + t.getMessage());
+        }
     }
     
     public void handleCallMissed(String id, String name, String number) {
@@ -283,78 +292,117 @@ public class CallManager {
     // =========================================================================
     
     public void answerCall(final String id) {
-        app.getAudioManager().stopCallRingtone();
-        HardwareManager.stopAlerts();
-        app.getAudioManager().playCallConnectBeep();
-        
-        // Démarrer le streaming audio bidirectionnel dès que l'utilisateur décroche
-        app.getCallAudioPlayerRecorder().startVoiceBridge();
-        
-        new Thread(new Runnable() {
-            public void run() {
-                app.getConnectionManager().sendData("CALL_ANSWER|" + id + "\n");
-            }
-        }).start();
-        
-        UiApplication.getUiApplication().invokeLater(new Runnable() {
-            public void run() {
-                if (activeCallScreen != null) {
-                    try { activeCallScreen.close(); } catch (Exception ignored) {}
-                    activeCallScreen = null;
+        try {
+            app.getAudioManager().stopCallRingtone();
+            HardwareManager.stopAlerts();
+            app.getAudioManager().playCallConnectBeep();
+            
+            new Thread(new Runnable() {
+                public void run() {
+                    try {
+                        app.getConnectionManager().sendData("CALL_ANSWER|" + id + "\n");
+                    } catch (Throwable t) {
+                        System.out.println("[BB ERROR] " + t.getMessage());
+                    }
                 }
-                if (phoneCallScreen == null) {
-                    phoneCallScreen = new PhoneCallScreen(CallManager.this, id, "Appel", "", "", false);
-                    uiManager.pushScreen(phoneCallScreen);
+            }).start();
+            
+            UiApplication.getUiApplication().invokeLater(new Runnable() {
+                public void run() {
+                    try {
+                        if (activeCallScreen != null) {
+                            try { activeCallScreen.close(); } catch (Exception ignored) {}
+                            activeCallScreen = null;
+                        }
+                        if (phoneCallScreen == null) {
+                            phoneCallScreen = new PhoneCallScreen(CallManager.this, id, "Appel", "", "", false);
+                            uiManager.pushScreen(phoneCallScreen);
+                        } else {
+                            phoneCallScreen.setCallActive(null);
+                        }
+                    } catch (Throwable t) {
+                        System.out.println("[BB ERROR] " + t.getMessage());
+                    }
                 }
-            }
-        });
+            });
+        } catch (Throwable t) {
+            System.out.println("[BB ERROR] " + t.getMessage());
+        }
     }
     
     public void rejectCall(final String id) {
-        app.getAudioManager().stopCallRingtone();
-        HardwareManager.stopAlerts();
-        app.getCallAudioPlayerRecorder().stopVoiceBridge();
-        callInProgress = false;
-        activeCallId = null;
-        
-        new Thread(new Runnable() {
-            public void run() {
-                app.getConnectionManager().sendData("CALL_REJECT|" + id + "\n");
-            }
-        }).start();
-        
-        if (phoneCallScreen != null) {
-            try { phoneCallScreen.close(); } catch (Exception ignored) {}
-            phoneCallScreen = null;
-        }
-        if (activeCallScreen != null) {
-            try { activeCallScreen.close(); } catch (Exception ignored) {}
-            activeCallScreen = null;
+        try {
+            app.getAudioManager().stopCallRingtone();
+            HardwareManager.stopAlerts();
+            callInProgress = false;
+            activeCallId = null;
+            
+            new Thread(new Runnable() {
+                public void run() {
+                    try {
+                        app.getConnectionManager().sendData("CALL_REJECT|" + id + "\n");
+                    } catch (Throwable t) {
+                        System.out.println("[BB ERROR] " + t.getMessage());
+                    }
+                }
+            }).start();
+            
+            UiApplication.getUiApplication().invokeLater(new Runnable() {
+                public void run() {
+                    try {
+                        if (phoneCallScreen != null) {
+                            try { phoneCallScreen.close(); } catch (Exception ignored) {}
+                            phoneCallScreen = null;
+                        }
+                        if (activeCallScreen != null) {
+                            try { activeCallScreen.close(); } catch (Exception ignored) {}
+                            activeCallScreen = null;
+                        }
+                    } catch (Throwable t) {
+                        System.out.println("[BB ERROR] " + t.getMessage());
+                    }
+                }
+            });
+        } catch (Throwable t) {
+            System.out.println("[BB ERROR] " + t.getMessage());
         }
     }
     
     public void endCurrentCall() {
-        app.getAudioManager().stopCallRingtone();
-        HardwareManager.stopAlerts();
-        app.getAudioManager().playCallEndBeep();
-        app.getCallAudioPlayerRecorder().stopVoiceBridge();
-        callInProgress = false;
-        activeCallId = null;
-        speakerOn = false;
-        
-        new Thread(new Runnable() {
-            public void run() {
-                app.getConnectionManager().sendData("CALL_END\n");
-            }
-        }).start();
-        
-        if (phoneCallScreen != null) {
-            phoneCallScreen.setCallEnded();
-            phoneCallScreen = null;
-        }
-        if (activeCallScreen != null) {
-            activeCallScreen.setCallEnded();
-            activeCallScreen = null;
+        try {
+            app.getAudioManager().stopCallRingtone();
+            HardwareManager.stopAlerts();
+            callInProgress = false;
+            activeCallId = null;
+            speakerOn = false;
+            
+            new Thread(new Runnable() {
+                public void run() {
+                    try {
+                        app.getConnectionManager().sendData("CALL_END\n");
+                    } catch (Throwable t) {
+                        System.out.println("[BB ERROR] " + t.getMessage());
+                    }
+                }
+            }).start();
+            
+            UiApplication.getUiApplication().invokeLater(new Runnable() {
+                public void run() {
+                    try {
+                        if (phoneCallScreen != null) {
+                            phoneCallScreen.setCallEnded();
+                        }
+                        if (activeCallScreen != null) {
+                            activeCallScreen.setCallEnded();
+                            activeCallScreen = null;
+                        }
+                    } catch (Throwable t) {
+                        System.out.println("[BB ERROR] " + t.getMessage());
+                    }
+                }
+            });
+        } catch (Throwable t) {
+            System.out.println("[BB ERROR] " + t.getMessage());
         }
     }
     
@@ -486,6 +534,25 @@ public class CallManager {
                 } catch (Throwable ignored) {}
             }
         });
+    }
+
+    public void handleVolumeOk(final String direction) {
+        try {
+            LogManager.log("CALL", "Volume ack: " + direction);
+            UiApplication.getUiApplication().invokeLater(new Runnable() {
+                public void run() {
+                    try {
+                        if (phoneCallScreen != null) {
+                            phoneCallScreen.updateVolumeDisplay();
+                        }
+                    } catch (Throwable t) {
+                        System.out.println("[BB ERROR] " + t.getMessage());
+                    }
+                }
+            });
+        } catch (Throwable t) {
+            System.out.println("[BB ERROR] " + t.getMessage());
+        }
     }
 
     public boolean isMicMuted() {

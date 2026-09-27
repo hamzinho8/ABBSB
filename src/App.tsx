@@ -55,7 +55,8 @@ export default function App() {
     number: '+212634934134',
     simName: 'inwi'
   });
-  const [speakerOn, setSpeakerOn] = useState<boolean>(false);
+  const [speakerOn, setSpeakerOn] = useState<boolean>(true);
+  const [micMuted, setMicMuted] = useState<boolean>(false);
   const [audioRoute, setAudioRoute] = useState<AudioRoute>('BLUETOOTH');
   const [localBbSpeaker, setLocalBbSpeaker] = useState<boolean>(false);
   const [simChoiceModalOpen, setSimChoiceModalOpen] = useState<boolean>(false);
@@ -270,7 +271,7 @@ export default function App() {
     setCallState('ended');
     addLog('TX', 'CALL_END');
     addLog('RX', `CALL_END|${currentCaller.id}`);
-    addLog('UI', 'Fin d\'appel : Bip sonore BlackBerry (Alert.startAudio)');
+    addLog('UI', "Fin d'appel : Bip sonore BlackBerry Alert.startBuzzer(150) - Fermeture automatique dans 1.5s");
     
     // Determine call direction
     const direction: 'incoming' | 'outgoing' = currentCaller.id.startsWith('out_') ? 'outgoing' : 'incoming';
@@ -279,18 +280,38 @@ export default function App() {
 
     setTimeout(() => {
       setCallState('idle');
-      setSpeakerOn(false);
-      addLog('UI', 'Retour à l\'écran d\'accueil');
-    }, 1400);
+      addLog('UI', 'PhoneCallScreen fermé - Retour à l\'écran principal');
+    }, 1500);
   };
 
-  // Toggle smartphone speaker
+  // Toggle smartphone speaker (SPEAKER_TOGGLE)
   const handleToggleSpeaker = () => {
     const nextState = !speakerOn;
     addLog('TX', 'SPEAKER_TOGGLE');
     setSpeakerOn(nextState);
     addLog('RX', `SPEAKER_STATUS|${nextState ? 'ON' : 'OFF'}`);
-    addLog('UI', `Haut-Parleur Smartphone: ${nextState ? 'ACTIVÉ' : 'DÉSACTIVÉ'}`);
+    addLog('UI', `Mains-libres Smartphone : ${nextState ? 'ACTIF' : 'INACTIF'}`);
+  };
+
+  // Toggle microphone mute (MUTE_TOGGLE)
+  const handleToggleMute = () => {
+    const nextState = !micMuted;
+    addLog('TX', 'MUTE_TOGGLE');
+    setMicMuted(nextState);
+    addLog('RX', `MUTE_STATUS|${nextState ? 'MUTED' : 'UNMUTED'}`);
+    addLog('UI', `Micro Smartphone : ${nextState ? 'MUTÉ' : 'ACTIF'}`);
+  };
+
+  const handleVolumeUp = () => {
+    addLog('TX', 'VOLUME_UP');
+    addLog('RX', 'VOLUME_OK|UP');
+    addLog('UI', 'Volume smartphone augmenté (+)');
+  };
+
+  const handleVolumeDown = () => {
+    addLog('TX', 'VOLUME_DOWN');
+    addLog('RX', 'VOLUME_OK|DOWN');
+    addLog('UI', 'Volume smartphone diminué (-)');
   };
 
   // Change Audio Route
@@ -523,97 +544,111 @@ export default function App() {
 
               {/* OUTBOUND OR ACTIVE CALL SCREEN */}
               {(callState === 'outbound_dialing' || callState === 'active' || callState === 'ended') && (
-                <div className="flex-1 bg-black flex flex-col justify-between p-2 text-center">
+                <div className="flex-1 bg-black flex flex-col justify-between p-2 text-center select-none">
+                  {/* Titre : Appel en cours [SIM: ...] */}
                   <div>
                     <div className={`text-xs font-bold uppercase tracking-wider ${
-                      callState === 'ended' ? 'text-red-400' :
-                      callState === 'active' ? 'text-green-400' : 'text-cyan-400'
+                      callState === 'ended' ? 'text-red-500' : 'text-cyan-400'
                     }`}>
-                      {callState === 'ended' ? 'APPEL TERMINÉ' :
-                       callState === 'active' ? 'COMMUNICATION ACTIVE' : 'APPEL SORTANT'}
+                      {callState === 'ended' ? 'APPEL TERMINÉ' : `Appel en cours [SIM: ${currentCaller.simName}]`}
                     </div>
-                    <div className="text-xs font-bold text-yellow-400">
-                      sur [{currentCaller.simName}]
-                    </div>
-                    <div className="w-full h-[1px] bg-gray-800 my-0.5"></div>
+                    <div className="w-full h-[1px] bg-cyan-900/40 my-1"></div>
                   </div>
 
-                  <div>
-                    <div className="text-base font-bold text-white leading-tight">
+                  <div className="py-0.5 space-y-0.5">
+                    {/* Nom du contact en grand (Font Bold 22pt) */}
+                    <div className="text-xl font-bold text-white tracking-wide leading-tight drop-shadow">
                       {currentCaller.name}
                     </div>
-                    <div className="text-xs text-gray-400">
+                    {/* Numéro en dessous (Font Normal 16pt) */}
+                    <div className="text-sm text-gray-300 font-mono">
                       {currentCaller.number}
                     </div>
 
-                    {/* DURATION OR STATUS */}
-                    <div className={`text-xs font-bold mt-1 flex items-center justify-center gap-1.5 ${
-                      callState === 'ended' ? 'text-red-400' :
-                      callState === 'active' ? 'text-green-400' : 'text-cyan-300'
+                    {/* Durée : "00:00" incrémentée chaque seconde dès réception de CALL_ACTIVE */}
+                    <div className={`text-lg font-bold font-mono tracking-wider ${
+                      callState === 'ended' ? 'text-red-400' : 'text-emerald-400'
                     }`}>
-                      {callState === 'active' ? (
-                        <>
-                          <Clock className="w-3 h-3 animate-pulse" />
-                          <span>En communication ({formatDuration(durationSeconds)})</span>
-                        </>
-                      ) : callState === 'ended' ? (
-                        <span>Durée : {formatDuration(durationSeconds)} - Terminé</span>
-                      ) : (
-                        <span>Numérotation en cours...</span>
-                      )}
+                      {callState === 'ended' ? '00:00' : (callState === 'active' ? formatDuration(durationSeconds) : '--:--')}
                     </div>
 
-                    {/* AUDIO BADGE */}
-                    <div className="mt-1 flex flex-col items-center gap-0.5">
-                      <span className={`text-[10px] font-bold ${
-                        audioRoute === 'BLUETOOTH' ? 'text-cyan-400' :
-                        audioRoute === 'SPEAKERPHONE' ? 'text-amber-400' : 'text-gray-300'
-                      }`}>
-                        {audioRoute === 'BLUETOOTH' ? '[Audio: Bluetooth / BlackBerry]' :
-                         audioRoute === 'SPEAKERPHONE' ? '[Audio: Haut-parleur Smartphone]' :
-                         '[Audio: Écouteur Smartphone]'}
-                      </span>
-                      <div className="flex items-center gap-2 text-[9px]">
-                        <span className={speakerOn ? 'text-green-400 font-bold' : 'text-gray-500'}>
-                          [HP Tel: {speakerOn ? 'ON' : 'OFF'}]
-                        </span>
-                        <span className={localBbSpeaker ? 'text-green-400' : 'text-gray-400'}>
-                          [Sortie BB: {localBbSpeaker ? 'HP' : 'Combiné'}]
-                        </span>
-                      </div>
+                    {/* Statut : "Mains-libres smartphone : ACTIF" */}
+                    <div className={`text-xs font-bold transition-colors ${
+                      callState === 'ended' 
+                        ? 'text-red-500' 
+                        : speakerOn ? 'text-cyan-300' : 'text-gray-400'
+                    }`}>
+                      {callState === 'ended' 
+                        ? 'Appel terminé' 
+                        : `Mains-libres smartphone : ${speakerOn ? 'ACTIF' : 'INACTIF'}`}
                     </div>
+
+                    {/* Indicateur Micro */}
+                    {callState !== 'ended' && (
+                      <div className={`text-[10px] font-semibold ${micMuted ? 'text-amber-400' : 'text-sky-400'}`}>
+                        {micMuted ? 'Micro smartphone : MUTÉ' : 'Micro smartphone : ACTIF'}
+                      </div>
+                    )}
                   </div>
 
-                  {/* ACTION BUTTONS */}
-                  <div>
+                  {/* ACTION BUTTONS & TOUCH CONTROLS */}
+                  <div className="space-y-1">
                     {callState !== 'ended' ? (
-                      <div className="flex justify-center gap-1.5 mb-1">
+                      <div className="flex justify-center items-center gap-1.5">
                         <button 
                           onClick={handleHangup} 
-                          className="px-2.5 py-1 bg-red-700 hover:bg-red-600 text-white font-bold rounded text-xs cursor-pointer border border-red-400 shadow"
+                          title="Touche Rouge / KEY_END"
+                          className="px-2.5 py-1 bg-red-950/80 hover:bg-red-800 text-red-200 font-bold rounded text-xs cursor-pointer border border-red-500/80 shadow transition active:scale-95"
                         >
                           Raccrocher
                         </button>
                         <button 
-                          onClick={handleToggleSpeaker} 
-                          className={`px-2 py-1 font-bold rounded text-xs cursor-pointer border ${speakerOn ? 'bg-cyan-800 border-cyan-400 text-white' : 'bg-gray-800 border-gray-600 text-gray-200'}`}
+                          onClick={handleToggleMute} 
+                          title="Touche Espace / Clic Trackpad"
+                          className={`px-2 py-1 font-bold rounded text-xs cursor-pointer border transition active:scale-95 ${
+                            micMuted 
+                              ? 'bg-amber-950/80 border-amber-500 text-amber-200' 
+                              : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-500'
+                          }`}
                         >
-                          {speakerOn ? 'HP: ON' : 'HP Tel'}
+                          {micMuted ? 'Micro: OFF' : 'Micro: ON'}
                         </button>
                         <button 
-                          onClick={() => setAudioChoiceModalOpen(true)} 
-                          className="px-2 py-1 bg-cyan-900/60 hover:bg-cyan-800 text-cyan-200 font-bold rounded text-xs cursor-pointer border border-cyan-500/50"
+                          onClick={handleToggleSpeaker} 
+                          title="Touche M"
+                          className={`px-2 py-1 font-bold rounded text-xs cursor-pointer border transition active:scale-95 ${
+                            speakerOn 
+                              ? 'bg-cyan-950/80 border-cyan-400 text-cyan-200' 
+                              : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-500'
+                          }`}
                         >
-                          Audio...
+                          {speakerOn ? 'HP: ON' : 'HP: OFF'}
                         </button>
+                        <div className="flex flex-col gap-0.5">
+                          <button 
+                            onClick={handleVolumeUp}
+                            className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-cyan-300 text-[10px] font-bold rounded"
+                            title="Volume +"
+                          >
+                            +
+                          </button>
+                          <button 
+                            onClick={handleVolumeDown}
+                            className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-cyan-300 text-[10px] font-bold rounded"
+                            title="Volume -"
+                          >
+                            -
+                          </button>
+                        </div>
                       </div>
                     ) : (
-                      <div className="text-[10px] text-red-300 py-1 font-bold">
-                        Bip de fin... Fermeture automatique
+                      <div className="text-xs text-red-400 py-1 font-bold animate-pulse">
+                        Bip de fin Alert.startBuzzer(150)... Fermeture auto
                       </div>
                     )}
-                    <div className="text-[8px] text-gray-400">
-                      Menu BlackBerry : Option 'Haut-parleur ON/OFF' & 'Route Audio'
+
+                    <div className="text-[9px] text-gray-500">
+                      [Fin: Rouge | Espace: Mute | M: HP | Vol: Côté Droit]
                     </div>
                   </div>
                 </div>
