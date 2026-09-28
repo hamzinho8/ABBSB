@@ -289,6 +289,19 @@ public class SmartBridgeScreen extends MainScreen {
             }
         });
 
+        final boolean isStreaming = com.hamza.blackberrybridge.audio.BluetoothAudioReceiver.getInstance().isRunning();
+        menu.add(new net.rim.device.api.ui.MenuItem(isStreaming ? "Couper Audio Smartphone" : "Écouter Audio Smartphone", 105, 7) {
+            public void run() {
+                if (com.hamza.blackberrybridge.audio.BluetoothAudioReceiver.getInstance().isRunning()) {
+                    com.hamza.blackberrybridge.audio.BluetoothAudioReceiver.getInstance().stopReceiver();
+                    app.getConnectionManager().sendData("AUDIO_PLAYBACK_STOP\n");
+                } else {
+                    com.hamza.blackberrybridge.audio.BluetoothAudioReceiver.getInstance().startReceiver();
+                    app.getConnectionManager().sendData("AUDIO_PLAYBACK_START\n");
+                }
+            }
+        });
+
         menu.add(new net.rim.device.api.ui.MenuItem("Faire sonner l'Android", 110, 10) {
             public void run() {
                 app.getConnectionManager().sendData("FIND_PHONE\n");

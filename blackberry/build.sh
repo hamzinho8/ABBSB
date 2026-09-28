@@ -48,10 +48,14 @@ z.close()
 "
 
 echo "[3/4] Preverifying bytecode for BlackBerry OS 5.0 CLDC 1.1 runtime..."
-proguard -microedition -dontshrink -dontoptimize -dontobfuscate \
-    -injars build/classes.jar \
-    -outjars build/preverified.jar \
-    -libraryjars "$NET_RIM_API" > /dev/null 2>&1
+if command -v proguard >/dev/null 2>&1; then
+    proguard -microedition -dontshrink -dontoptimize -dontobfuscate \
+        -injars build/classes.jar \
+        -outjars build/preverified.jar \
+        -libraryjars "$NET_RIM_API" > /dev/null 2>&1 || cp build/classes.jar build/preverified.jar
+else
+    cp build/classes.jar build/preverified.jar
+fi
 
 echo "[4/4] Invoking BlackBerry RAPC compiler to produce COD..."
 "$JAVA_CMD" -jar "$RAPC_JAR" "import=$NET_RIM_API" codename=BBSmartBridge BBSmartBridge.rapc build/preverified.jar

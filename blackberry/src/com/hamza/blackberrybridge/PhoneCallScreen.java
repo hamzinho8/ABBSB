@@ -427,8 +427,11 @@ public class PhoneCallScreen extends MainScreen {
             this.isActive = false;
             this.isRinging = false;
             
-            // 1. Arrêter immédiatement le chronomètre d'appel
+            // 1. Arrêter immédiatement le chronomètre d'appel et le récepteur audio
             stopTimer();
+            try {
+                com.hamza.blackberrybridge.audio.BluetoothAudioReceiver.getInstance().stopReceiver();
+            } catch (Throwable ignored) {}
             
             // 2. Émettre un bip court de fin d'appel : Alert.startBuzzer(150);
             startBuzzer(150);
@@ -627,6 +630,7 @@ public class PhoneCallScreen extends MainScreen {
     public boolean onClose() {
         try {
             stopTimer();
+            com.hamza.blackberrybridge.audio.BluetoothAudioReceiver.getInstance().stopReceiver();
         } catch (Throwable t) {
             System.out.println("[BB ERROR] " + t.getMessage());
         }

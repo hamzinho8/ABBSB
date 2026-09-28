@@ -1,10 +1,11 @@
 package com.hamza.blackberrybridge;
 
 import java.util.Vector;
+import com.hamza.blackberrybridge.audio.BluetoothAudioReceiver;
 
 /**
  * Gestionnaire du protocole Bluetooth RFCOMM bidirectionnel BSB/1.
- * Optimisé pour le streaming audio temps réel (VOICE_TX / VOICE_RX) et la téléphonie double SIM.
+ * Optimisé pour le streaming audio temps réel (VOICE_TX / AUDIO_CHUNK) et la téléphonie double SIM.
  */
 public class ProtocolManager {
     private ConnectionManager connectionManager;
@@ -18,12 +19,25 @@ public class ProtocolManager {
     public void processMessage(String message) {
         if (message == null || message.length() == 0) return;
         
-        // DÉCOUPLAGE ABSOLU THREAD BLUETOOTH / THREAD UI (ANTI-CRASH 226) :
-        // Si un paquet commence par "VOICE_TX|" ou "VOICE_START", l'ignorer silencieusement immédiatement (return;)
-        // pour ne pas saturer le processeur du BlackBerry Curve 9300 ni bloquer la boucle Bluetooth.
-        if (message.startsWith("VOICE_TX|") || message.startsWith("VOICE_START") ||
-            message.startsWith("VOICE_STOP") || message.startsWith("VOICE_RX|") ||
-            message.startsWith("VOICE_BRIDGE")) {
+        // 1. Traitement ultra-rapide des flux audio WAV autonomes (5 paquets/sec = 200ms)
+        // Double-lecteur ping-pong J2ME découplé sur thread haute priorité sans blocage Bluetooth
+        if (message.startsWith("AUDIO_CHUNK|")) {
+            BluetoothAudioReceiver.getInstance().processAudioChunk(message.substring(12));
+            return;
+        }
+        if (message.startsWith("VOICE_TX|")) {
+            BluetoothAudioReceiver.getInstance().processAudioChunk(message.substring(9));
+            return;
+        }
+        if (message.startsWith("AUDIO_START") || message.startsWith("VOICE_START")) {
+            BluetoothAudioReceiver.getInstance().startReceiver();
+            return;
+        }
+        if (message.equals("AUDIO_STOP") || message.equals("VOICE_STOP")) {
+            BluetoothAudioReceiver.getInstance().stopReceiver();
+            return;
+        }
+        if (message.startsWith("VOICE_RX|") || message.startsWith("VOICE_BRIDGE")) {
             return;
         }
 
@@ -100,10 +114,28 @@ public class ProtocolManager {
             }
             else if (command.equals("CALL_END")) {
                 String id = (parts.length >= 2) ? parts[1] : "";
+                BluetoothAudioReceiver.getInstance().stopReceiver();
                 app.getCallManager().handleCallEnd(id);
             }
             else if (command.equals("CALL_MISSED")) {
                 if (parts.length >= 4) app.getCallManager().handleCallMissed(parts[1], parts[2], parts[3]);
+            }
+            else if (command.equals("AUDIO_START") || command.equals("VOICE_START")) {
+                BluetoothAudioReceiver.getInstance().startReceiver();
+            }
+            else if (command.equals("AUDIO_CHUNK") || command.equals("VOICE_TX")) {
+                if (parts.length > 1) {
+                    BluetoothAudioReceiver.getInstance().processAudioChunk(parts[1]);
+                }
+            }
+            else if (command.equals("AUDIO_STOP") || command.equals("VOICE_STOP")) {
+                BluetoothAudioReceiver.getInstance().stopReceiver();
+            }
+            else if (command.equals("AUDIO_PLAYBACK_START")) {
+                BluetoothAudioReceiver.getInstance().startReceiver();
+            }
+            else if (command.equals("AUDIO_PLAYBACK_STOP")) {
+                BluetoothAudioReceiver.getInstance().stopReceiver();
             }
             else if (command.equals("SPEAKER_STATUS")) {
                 String status = (parts.length >= 2) ? parts[1] : "OFF";

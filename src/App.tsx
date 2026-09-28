@@ -57,6 +57,7 @@ export default function App() {
   });
   const [speakerOn, setSpeakerOn] = useState<boolean>(true);
   const [micMuted, setMicMuted] = useState<boolean>(false);
+  const [isAudioStreaming, setIsAudioStreaming] = useState<boolean>(false);
   const [audioRoute, setAudioRoute] = useState<AudioRoute>('BLUETOOTH');
   const [localBbSpeaker, setLocalBbSpeaker] = useState<boolean>(false);
   const [simChoiceModalOpen, setSimChoiceModalOpen] = useState<boolean>(false);
@@ -312,6 +313,22 @@ export default function App() {
     addLog('TX', 'VOLUME_DOWN');
     addLog('RX', 'VOLUME_OK|DOWN');
     addLog('UI', 'Volume smartphone diminué (-)');
+  };
+
+  // Toggle audio playback streaming (YouTube / Music / Media)
+  const handleToggleAudioStreaming = () => {
+    if (isAudioStreaming) {
+      setIsAudioStreaming(false);
+      addLog('TX', 'AUDIO_PLAYBACK_STOP');
+      addLog('RX', 'AUDIO_STOP');
+      addLog('UI', 'Diffusion audio smartphone arrêtée (BluetoothAudioReceiver)');
+    } else {
+      setIsAudioStreaming(true);
+      addLog('TX', 'AUDIO_PLAYBACK_START');
+      addLog('RX', 'AUDIO_START|8000|1|16|200');
+      addLog('RX', 'AUDIO_CHUNK|<WAV 200ms Base64>');
+      addLog('UI', 'Diffusion audio smartphone active : double-lecteur ping-pong J2ME démarré (200ms)');
+    }
   };
 
   // Change Audio Route
@@ -726,6 +743,15 @@ export default function App() {
                         <span className="text-[9px] font-mono">{localBbSpeaker ? 'HP' : 'Combiné'}</span>
                       </button>
                       <button
+                        onClick={handleToggleAudioStreaming}
+                        className={`w-full py-1 px-2 text-left rounded border flex items-center justify-between cursor-pointer transition ${
+                          isAudioStreaming ? 'bg-purple-900/80 text-purple-200 border-purple-400' : 'bg-gray-800 text-gray-300 border-gray-700 hover:border-purple-400'
+                        }`}
+                      >
+                        <span>{isAudioStreaming ? '5: Couper Audio Smartphone' : '5: Écouter Audio Smartphone (WAV 200ms)'}</span>
+                        <Radio className={`w-3 h-3 ${isAudioStreaming ? 'text-purple-300 animate-pulse' : 'text-gray-400'}`} />
+                      </button>
+                      <button
                         onClick={() => setAudioChoiceModalOpen(false)}
                         className="w-full py-0.5 text-[9px] text-gray-400 hover:text-white cursor-pointer"
                       >
@@ -946,6 +972,18 @@ export default function App() {
               >
                 <PhoneOff className="w-4 h-4" />
                 <span>Fin d'appel (CALL_END)</span>
+              </button>
+
+              <button
+                onClick={handleToggleAudioStreaming}
+                className={`p-2 border rounded font-semibold flex flex-col items-center gap-1 cursor-pointer col-span-2 sm:col-span-4 transition ${
+                  isAudioStreaming 
+                    ? 'bg-purple-950/80 border-purple-500 text-purple-200 animate-pulse' 
+                    : 'bg-purple-950/40 hover:bg-purple-900/60 border-purple-700/50 text-purple-300'
+                }`}
+              >
+                <Radio className="w-4 h-4" />
+                <span>{isAudioStreaming ? '🔊 Couper Diffusion Audio (AUDIO_STOP)' : '📻 Écouter Audio Smartphone (AUDIO_START - 200ms Ping-Pong)'}</span>
               </button>
             </div>
 
