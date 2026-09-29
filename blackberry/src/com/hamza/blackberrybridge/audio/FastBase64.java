@@ -13,7 +13,6 @@ public class FastBase64 {
 
     public static byte[] decode(String s) {
         if (s == null || s.length() == 0) return new byte[0];
-        
         int len = s.length();
         int pad = 0;
         if (len > 0 && s.charAt(len - 1) == '=') pad++;
@@ -35,7 +34,6 @@ public class FastBase64 {
             if (c0 < 0 || c1 < 0) continue;
             
             int triple = (c0 << 18) | (c1 << 12) | (c2 << 6) | c3;
-            
             if (outIdx < outLen) out[outIdx++] = (byte) ((triple >> 16) & 0xFF);
             if (outIdx < outLen) out[outIdx++] = (byte) ((triple >> 8) & 0xFF);
             if (outIdx < outLen) out[outIdx++] = (byte) (triple & 0xFF);
