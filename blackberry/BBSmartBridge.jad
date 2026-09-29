@@ -1,22 +1,22 @@
 Manifest-Version: 1.0
 MIDlet-Version: 1.4.0
-MIDlet-Jar-Size: 69588
+MIDlet-Jar-Size: 69884
 MicroEdition-Configuration: CLDC-1.1
 MIDlet-Jar-URL: BBSmartBridge.jar
 RIM-COD-Module-Dependencies: net_rim_cldc,net_rim_bluetooth,net_rim_pdap
 RIM-COD-URL-1: BBSmartBridge-1.cod
-RIM-COD-SHA1-1: 17 1c fc 29 a0 41 85 23 16 b7 76 4c 2a 8a e3 52 cf 27 5b 35
+RIM-COD-SHA1-1: d1 bb 27 ad 58 08 2b 06 0b dd eb 93 03 61 3f f5 b1 87 eb c4
 RIM-MIDlet-Flags-1: 0
-RIM-COD-Size-1: 49272
+RIM-COD-Size-1: 49728
 RIM-COD-Module-Name: BBSmartBridge
 RIM-COD-Size: 64700
 MIDlet-Name: SmartBridge
-RIM-COD-Creation-Time: 1790677105
+RIM-COD-Creation-Time: 1790683287
 RIM-MIDlet-Position-1: 0
 MIDlet-1: SmartBridge,icon.png,com.hamza.blackberrybridge.SmartBridgeApp
 RIM-COD-URL: BBSmartBridge.cod
 MIDlet-Description: Android Bluetooth Companion for BlackBerry with HFP Audio Routing
-RIM-COD-SHA1: d5 6a 2c f5 de 47 8d ed 11 1f 2e 0b b6 a3 73 37 30 cf 49 d4
+RIM-COD-SHA1: 5f ea 24 fa ec fb 97 b6 48 4d d8 ef f5 d9 0e 02 3a c2 36 63
 MIDlet-Permissions: javax.microedition.io.Connector.bluetooth.client, javax.microedition.io.Connector.bluetooth.server, javax.microedition.media.control.RecordControl
 MicroEdition-Profile: MIDP-2.0
 MIDlet-Vendor: Hamza

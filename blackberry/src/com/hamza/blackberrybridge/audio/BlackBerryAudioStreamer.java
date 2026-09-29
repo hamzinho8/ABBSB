@@ -6,19 +6,11 @@ import javax.microedition.media.Manager;
 import javax.microedition.media.Player;
 import javax.microedition.media.control.VolumeControl;
 
-/**
- * Lecteur audio séquentiel unique sur Thread ouvrier dédié pour BlackBerry Curve 9300.
- * Conçu pour lire les flux WAV autonomes (500 ms / 200 ms, 8000 Hz, 16-bit Mono).
- * 
- * Évite les conflits d'allocation matérielle audio et le crash JVM (226) en :
- * - Utilisant une file d'attente FIFO (Vector) avec purge automatique en cas de retard (> 4 blocs).
- * - Garantissant qu'un seul Player J2ME est actif à la fois.
- * - Attendant la fin de la lecture du bloc avant de fermer proprement les ressources.
- */
 public class BlackBerryAudioStreamer implements Runnable {
     private static BlackBerryAudioStreamer instance;
     private final Vector chunkQueue = new Vector();
     private boolean isRunning = false;
+    private boolean hasBeeped = false;
     private Thread workerThread;
     private int volume = 100;
 
@@ -32,6 +24,7 @@ public class BlackBerryAudioStreamer implements Runnable {
     public synchronized void startAudio() {
         if (isRunning) return;
         isRunning = true;
+        hasBeeped = false;
         synchronized (chunkQueue) {
             chunkQueue.removeAllElements();
         }
@@ -46,9 +39,8 @@ public class BlackBerryAudioStreamer implements Runnable {
         byte[] wavBytes = FastBase64.decode(base64Data);
         if (wavBytes != null && wavBytes.length > 44) {
             synchronized (chunkQueue) {
-                // Si la file dépasse 4 blocs (2 secondes de retard à 500ms), purge des plus anciens
                 if (chunkQueue.size() > 4) {
-                    chunkQueue.removeElementAt(0);
+                    chunkQueue.removeElementAt(0); // Évite le retard audio
                 }
                 chunkQueue.addElement(wavBytes);
                 chunkQueue.notify();
@@ -73,35 +65,52 @@ public class BlackBerryAudioStreamer implements Runnable {
             }
 
             if (wavBytes != null) {
+                // Émettre un bip court de confirmation au premier paquet reçu pour valider le matériel audio
+                if (!hasBeeped) {
+                    hasBeeped = true;
+                    try {
+                        Manager.playTone(69, 100, 100); // Note La4 (440Hz), 100ms, volume 100%
+                    } catch (Exception e) {}
+                }
+
                 Player player = null;
                 try {
                     ByteArrayInputStream bais = new ByteArrayInputStream(wavBytes);
-                    player = Manager.createPlayer(bais, "audio/x-wav");
+                    try {
+                        player = Manager.createPlayer(bais, "audio/x-wav");
+                    } catch (Exception ex) {
+                        bais.reset();
+                        player = Manager.createPlayer(bais, "audio/wav");
+                    }
+
                     player.realize();
                     player.prefetch();
-                    
+
                     VolumeControl vc = (VolumeControl) player.getControl("VolumeControl");
                     if (vc != null) {
                         vc.setLevel(volume);
                     }
-                    
+
                     player.start();
-                    
-                    // On attend la fin de lecture du bloc (500 ms) avant de libérer le matériel
-                    // Cela évite les conflits d'allocation audio et l'erreur JVM 226
-                    while (player != null && player.getState() == Player.STARTED && isRunning) {
+
+                    long start = System.currentTimeMillis();
+                    while (player.getState() == Player.STARTED && (System.currentTimeMillis() - start) < 550) {
                         try {
-                            Thread.sleep(50);
+                            Thread.sleep(25);
                         } catch (InterruptedException ie) {
                             break;
                         }
                     }
                 } catch (Throwable t) {
-                    // Ignore et continue pour ne jamais crasher l'app
+                    System.out.println("[AudioStreamer] Erreur: " + t.getMessage());
                 } finally {
                     if (player != null) {
-                        try { player.stop(); } catch (Exception e) {}
-                        try { player.close(); } catch (Exception e) {}
+                        try {
+                            player.stop();
+                        } catch (Exception e) {}
+                        try {
+                            player.close();
+                        } catch (Exception e) {}
                         player = null;
                     }
                 }
