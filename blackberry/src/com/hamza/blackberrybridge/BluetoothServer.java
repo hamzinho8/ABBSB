@@ -169,8 +169,8 @@ public class BluetoothServer {
             connectionManager.onConnected();
 
             // Read stream loop with 1024-byte block reading for optimal high-throughput audio
-            byte[] readBuffer = new byte[1024];
-            StringBuffer buffer = new StringBuffer(512);
+            byte[] readBuffer = new byte[2048];
+            StringBuffer buffer = new StringBuffer(16384);
             int read;
             while (running && connected) {
                 read = inputStream.read(readBuffer);
@@ -189,7 +189,7 @@ public class BluetoothServer {
                         }
                     } else if (ch != '\r') {
                         buffer.append(ch);
-                        if (buffer.length() > 4096) {
+                        if (buffer.length() > 65536) {
                             LogManager.error("BT_SRV", "Buffer overflow, dropping line");
                             buffer.setLength(0);
                         }

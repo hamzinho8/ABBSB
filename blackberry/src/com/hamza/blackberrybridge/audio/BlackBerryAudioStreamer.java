@@ -5,6 +5,7 @@ import java.util.Vector;
 import javax.microedition.media.Manager;
 import javax.microedition.media.Player;
 import javax.microedition.media.control.VolumeControl;
+import net.rim.device.api.media.control.AudioPathControl;
 
 public class BlackBerryAudioStreamer implements Runnable {
     private static BlackBerryAudioStreamer instance;
@@ -13,6 +14,7 @@ public class BlackBerryAudioStreamer implements Runnable {
     private boolean hasBeeped = false;
     private Thread workerThread;
     private int volume = 100;
+    private int forcedAudioPath = -1; // -1 = auto (headset if plugged, else handsfree)
 
     public static synchronized BlackBerryAudioStreamer getInstance() {
         if (instance == null) {
@@ -34,7 +36,12 @@ public class BlackBerryAudioStreamer implements Runnable {
     }
 
     public void enqueueChunk(String base64Data) {
-        if (!isRunning || base64Data == null || base64Data.length() == 0) return;
+        if (base64Data == null || base64Data.length() == 0) return;
+        
+        // Auto-démarrage si le flux commence sans commande AUDIO_START préalable
+        if (!isRunning) {
+            startAudio();
+        }
         
         byte[] wavBytes = FastBase64.decode(base64Data);
         if (wavBytes != null && wavBytes.length > 44) {
@@ -79,12 +86,29 @@ public class BlackBerryAudioStreamer implements Runnable {
                     try {
                         player = Manager.createPlayer(bais, "audio/x-wav");
                     } catch (Exception ex) {
-                        bais.reset();
-                        player = Manager.createPlayer(bais, "audio/wav");
+                        ByteArrayInputStream baisFallback = new ByteArrayInputStream(wavBytes);
+                        player = Manager.createPlayer(baisFallback, "audio/wav");
                     }
 
                     player.realize();
                     player.prefetch();
+
+                    // Routage intelligent du son vers le casque ou le haut-parleur
+                    try {
+                        AudioPathControl apc = (AudioPathControl) player.getControl("net.rim.device.api.media.control.AudioPathControl");
+                        if (apc == null) {
+                            apc = (AudioPathControl) player.getControl("AudioPathControl");
+                        }
+                        if (apc != null) {
+                            if (forcedAudioPath != -1 && apc.canSwitchToPath(forcedAudioPath)) {
+                                apc.setAudioPath(forcedAudioPath);
+                            } else if (apc.canSwitchToPath(AudioPathControl.AUDIO_PATH_HEADSET)) {
+                                apc.setAudioPath(AudioPathControl.AUDIO_PATH_HEADSET); // Prise Jack 3.5mm
+                            } else if (apc.canSwitchToPath(AudioPathControl.AUDIO_PATH_HANDSFREE)) {
+                                apc.setAudioPath(AudioPathControl.AUDIO_PATH_HANDSFREE); // Haut-parleur externe
+                            }
+                        }
+                    } catch (Throwable ignored) {}
 
                     VolumeControl vc = (VolumeControl) player.getControl("VolumeControl");
                     if (vc != null) {
@@ -142,5 +166,17 @@ public class BlackBerryAudioStreamer implements Runnable {
 
     public int getVolume() {
         return volume;
+    }
+
+    public synchronized void setForcedAudioPath(int path) {
+        this.forcedAudioPath = path;
+    }
+
+    public synchronized void toggleSpeakerHandset() {
+        if (forcedAudioPath == AudioPathControl.AUDIO_PATH_HANDSFREE) {
+            forcedAudioPath = AudioPathControl.AUDIO_PATH_HANDSET;
+        } else {
+            forcedAudioPath = AudioPathControl.AUDIO_PATH_HANDSFREE;
+        }
     }
 }
