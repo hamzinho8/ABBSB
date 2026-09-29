@@ -786,6 +786,18 @@ public class PhoneCallScreen extends MainScreen {
                     public void run() { sendVolumeDown(); }
                 });
             }
+            if (callManager != null && callManager.getApp() != null) {
+                menu.add(new MenuItem("Journal des Appels", 110, 50) {
+                    public void run() {
+                        callManager.getApp().getUIManager().openCallHistory();
+                    }
+                });
+                menu.add(new MenuItem("Carnet de Contacts", 110, 60) {
+                    public void run() {
+                        callManager.getApp().getUIManager().openContacts();
+                    }
+                });
+            }
         } catch (Throwable t) {
             System.out.println("[BB ERROR] " + t.getMessage());
         }

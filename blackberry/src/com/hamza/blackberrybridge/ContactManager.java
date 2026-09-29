@@ -51,6 +51,16 @@ public class ContactManager {
                 }
             }
             LogManager.log("CONTACTS", "Loaded " + vipContacts.size() + " VIP contacts from RMS");
+            if (vipContacts.size() == 0) {
+                vipContacts.addElement(new Contact("1", "Amina Mansouri", "+212634934134", true));
+                vipContacts.addElement(new Contact("2", "Youssef Bennani", "+212655881230", true));
+                vipContacts.addElement(new Contact("3", "Hamza H.", "+212611223344", true));
+                vipContacts.addElement(new Contact("4", "Dr. Karim Lahlou", "+212672409918", true));
+                vipContacts.addElement(new Contact("5", "Fatima Zahra", "+212698712345", true));
+                vipContacts.addElement(new Contact("6", "Sara Alami", "+212644332211", true));
+                vipContacts.addElement(new Contact("7", "Service Client inwi", "220", true));
+                vipContacts.addElement(new Contact("8", "Service Client Orange", "121", true));
+            }
         } catch (Exception e) {
             LogManager.error("CONTACTS", "RMS load error: " + e.getMessage());
         } finally {

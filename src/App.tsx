@@ -1,1165 +1,1335 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Phone, 
+  PhoneCall, 
   PhoneIncoming, 
-  PhoneOutgoing,
+  PhoneOutgoing, 
+  PhoneMissed, 
   PhoneOff, 
+  Music, 
+  Disc3, 
+  Play, 
+  Pause, 
+  SkipBack, 
+  SkipForward, 
   Volume2, 
   VolumeX, 
-  CreditCard as SimIcon, 
-  Radio, 
   Users, 
-  Download, 
-  Smartphone,
-  Cpu,
-  CheckCircle2,
-  Send,
-  Sliders,
-  BatteryMedium,
-  Mic,
-  Headphones,
-  Bluetooth,
-  HelpCircle,
-  Clock,
-  History,
-  PhoneCall
+  User, 
+  Clock, 
+  Search, 
+  History, 
+  RefreshCw, 
+  X, 
+  Radio, 
+  ArrowUpRight, 
+  ArrowDownLeft, 
+  Shield, 
+  Smartphone, 
+  Send, 
+  Mic, 
+  MicOff, 
+  Wifi, 
+  Battery, 
+  Layers, 
+  CheckCircle, 
+  Sliders, 
+  Plus, 
+  ChevronRight, 
+  Maximize2 
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { CallHistoryModal, CallRecord } from './components/CallHistoryModal';
-import { BatteryDischargeChart } from './components/BatteryDischargeChart';
+import { ContactsModal, ContactItem } from './components/ContactsModal';
+import { MediaControllerModal } from './components/MediaControllerModal';
 
+// Initial realistic call history (Émis, Reçus, Manqués)
+const INITIAL_CALL_RECORDS: CallRecord[] = [
+  {
+    id: 'call_1',
+    callerName: 'Amina Mansouri',
+    phoneNumber: '+212634934134',
+    timestamp: 'Aujourd\'hui 14:28',
+    direction: 'incoming',
+    duration: '04:12',
+    simName: 'inwi',
+    status: 'answered'
+  },
+  {
+    id: 'call_2',
+    callerName: 'Youssef Bennani',
+    phoneNumber: '+212655881230',
+    timestamp: 'Aujourd\'hui 12:15',
+    direction: 'outgoing',
+    duration: '01:45',
+    simName: 'Orange',
+    status: 'answered'
+  },
+  {
+    id: 'call_3',
+    callerName: 'Hamza H.',
+    phoneNumber: '+212611223344',
+    timestamp: 'Aujourd\'hui 10:04',
+    direction: 'incoming',
+    duration: '08:30',
+    simName: 'inwi',
+    status: 'answered'
+  },
+  {
+    id: 'call_4',
+    callerName: 'Service Client inwi',
+    phoneNumber: '220',
+    timestamp: 'Hier 18:40',
+    direction: 'outgoing',
+    duration: '02:10',
+    simName: 'inwi',
+    status: 'answered'
+  },
+  {
+    id: 'call_5',
+    callerName: 'Dr. Karim Lahlou',
+    phoneNumber: '+212672409918',
+    timestamp: 'Hier 15:22',
+    direction: 'incoming',
+    duration: 'Manqué',
+    simName: 'Orange',
+    status: 'missed'
+  },
+  {
+    id: 'call_6',
+    callerName: 'Fatima Zahra',
+    phoneNumber: '+212698712345',
+    timestamp: '24 Sep 11:15',
+    direction: 'incoming',
+    duration: '05:20',
+    simName: 'inwi',
+    status: 'answered'
+  },
+  {
+    id: 'call_7',
+    callerName: 'Orange Recharges',
+    phoneNumber: '121',
+    timestamp: '24 Sep 09:30',
+    direction: 'outgoing',
+    duration: '03:05',
+    simName: 'Orange',
+    status: 'answered'
+  },
+  {
+    id: 'call_8',
+    callerName: 'Sara Alami',
+    phoneNumber: '+212644332211',
+    timestamp: '23 Sep 16:50',
+    direction: 'incoming',
+    duration: 'Manqué',
+    simName: 'inwi',
+    status: 'missed'
+  }
+];
 
-interface Sim {
-  name: string;
-  slot: number;
-}
-
-type AudioRoute = 'BLUETOOTH' | 'SPEAKERPHONE' | 'EARPIECE';
+const INITIAL_CONTACTS: ContactItem[] = [
+  { id: '1', name: 'Amina Mansouri', number: '+212634934134', isVip: true, notes: 'Famille / Mobile inwi' },
+  { id: '2', name: 'Youssef Bennani', number: '+212655881230', isVip: true, notes: 'Bureau / Orange' },
+  { id: '3', name: 'Hamza H.', number: '+212611223344', isVip: true, notes: 'Ingénieur BlackBerry Bridge' },
+  { id: '4', name: 'Dr. Karim Lahlou', number: '+212672409918', isVip: true, notes: 'Clinique / Urgences' },
+  { id: '5', name: 'Fatima Zahra', number: '+212698712345', isVip: true, notes: 'Mobile' },
+  { id: '6', name: 'Sara Alami', number: '+212644332211', isVip: true, notes: 'Personnel' },
+  { id: '7', name: 'Service Client inwi', number: '220', isVip: true, notes: 'Assistance Télécom inwi' },
+  { id: '8', name: 'Service Client Orange', number: '121', isVip: true, notes: 'Assistance Télécom Orange' }
+];
 
 export default function App() {
-  // Bluetooth Link & Telephony State
-  const [sims, setSims] = useState<Sim[]>([
-    { name: 'inwi', slot: 0 },
-    { name: 'Orange', slot: 1 }
-  ]);
+  // Navigation / Tabs
+  const [activeTab, setActiveTab] = useState<'calls' | 'media' | 'contacts' | 'logs'>('calls');
   
-  // Call State
-  const [callState, setCallState] = useState<'idle' | 'incoming' | 'outbound_dialing' | 'active' | 'ended'>('idle');
-  const [currentCaller, setCurrentCaller] = useState({
-    id: 'call_1042',
-    name: 'Amina',
-    number: '+212634934134',
-    simName: 'inwi'
-  });
-  const [speakerOn, setSpeakerOn] = useState<boolean>(true);
-  const [micMuted, setMicMuted] = useState<boolean>(false);
-  const [isAudioStreaming, setIsAudioStreaming] = useState<boolean>(false);
-  const [audioRoute, setAudioRoute] = useState<AudioRoute>('BLUETOOTH');
-  const [localBbSpeaker, setLocalBbSpeaker] = useState<boolean>(false);
-  const [simChoiceModalOpen, setSimChoiceModalOpen] = useState<boolean>(false);
-  const [audioChoiceModalOpen, setAudioChoiceModalOpen] = useState<boolean>(false);
-  const [hfpGuideModalOpen, setHfpGuideModalOpen] = useState<boolean>(false);
-  const [callHistoryModalOpen, setCallHistoryModalOpen] = useState<boolean>(false);
-  const [dialNumber, setDialNumber] = useState<string>('+212634934134');
-  
-  // Call History State
-  const [callRecords, setCallRecords] = useState<CallRecord[]>([
-    {
-      id: 'rec_1',
-      callerName: 'Amina Mansouri',
-      phoneNumber: '+212634934134',
-      timestamp: 'Aujourd\'hui, 14:28',
-      direction: 'incoming',
-      duration: '04:12',
-      simName: 'inwi',
-      status: 'answered'
-    },
-    {
-      id: 'rec_2',
-      callerName: 'Youssef Bennani',
-      phoneNumber: '+212655881230',
-      timestamp: 'Aujourd\'hui, 12:15',
-      direction: 'outgoing',
-      duration: '01:45',
-      simName: 'Orange',
-      status: 'answered'
-    },
-    {
-      id: 'rec_3',
-      callerName: 'Hamza H.',
-      phoneNumber: '+212611223344',
-      timestamp: 'Aujourd\'hui, 10:04',
-      direction: 'incoming',
-      duration: '08:30',
-      simName: 'inwi',
-      status: 'answered'
-    },
-    {
-      id: 'rec_4',
-      callerName: 'Service Client inwi',
-      phoneNumber: '220',
-      timestamp: 'Hier, 18:40',
-      direction: 'outgoing',
-      duration: '02:10',
-      simName: 'inwi',
-      status: 'answered'
-    },
-    {
-      id: 'rec_5',
-      callerName: 'Dr. Karim Lahlou',
-      phoneNumber: '+212672409918',
-      timestamp: 'Hier, 15:22',
-      direction: 'incoming',
-      duration: '00:54',
-      simName: 'Orange',
-      status: 'answered'
-    },
-    {
-      id: 'rec_6',
-      callerName: 'Fatima Zahra',
-      phoneNumber: '+212698712345',
-      timestamp: '24 Sep, 20:11',
-      direction: 'incoming',
-      duration: '05:20',
-      simName: 'inwi',
-      status: 'answered'
-    },
-    {
-      id: 'rec_7',
-      callerName: 'Orange Recharges & Info',
-      phoneNumber: '121',
-      timestamp: '24 Sep, 16:30',
-      direction: 'outgoing',
-      duration: '03:05',
-      simName: 'Orange',
-      status: 'answered'
-    },
-    {
-      id: 'rec_8',
-      callerName: 'Sara Alami',
-      phoneNumber: '+212644332211',
-      timestamp: '23 Sep, 11:05',
-      direction: 'incoming',
-      duration: '02:18',
-      simName: 'inwi',
-      status: 'answered'
-    },
-    {
-      id: 'rec_9',
-      callerName: 'Mehdi Chraibi',
-      phoneNumber: '+212661908877',
-      timestamp: '23 Sep, 09:44',
-      direction: 'outgoing',
-      duration: '00:42',
-      simName: 'Orange',
-      status: 'answered'
-    },
-    {
-      id: 'rec_10',
-      callerName: 'Omar Tazi',
-      phoneNumber: '+212650123456',
-      timestamp: '22 Sep, 17:19',
-      direction: 'incoming',
-      duration: '06:14',
-      simName: 'inwi',
-      status: 'answered'
-    }
+  // Modals state
+  const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
+  const [isContactsModalOpen, setIsContactsModalOpen] = useState(false);
+  const [isCallHistoryModalOpen, setIsCallHistoryModalOpen] = useState(false);
+
+  // Call & History State
+  const [callRecords, setCallRecords] = useState<CallRecord[]>(INITIAL_CALL_RECORDS);
+  const [contacts, setContacts] = useState<ContactItem[]>(INITIAL_CONTACTS);
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyFilter, setHistoryFilter] = useState<'all' | 'outgoing' | 'incoming' | 'missed'>('all');
+
+  // Phone Dialer State
+  const [dialerNumber, setDialerNumber] = useState('');
+  const [selectedSim, setSelectedSim] = useState<'inwi' | 'Orange'>('inwi');
+
+  // Active Call State
+  const [activeCall, setActiveCall] = useState<{
+    id: string;
+    name: string;
+    number: string;
+    simName: string;
+    isOutbound: boolean;
+    state: 'ringing' | 'connected' | 'ended';
+    duration: number;
+    speakerOn: boolean;
+    micMuted: boolean;
+  } | null>(null);
+
+  // Media Player State
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [mediaTitle, setMediaTitle] = useState('Starboy (ft. Daft Punk)');
+  const [mediaArtist, setMediaArtist] = useState('The Weeknd');
+  const [mediaProgress, setMediaProgress] = useState(42);
+  const [mediaVolume, setMediaVolume] = useState(85);
+  const [isMuted, setIsMuted] = useState(false);
+  const [audioStreamingActive, setAudioStreamingActive] = useState(true);
+  const [chunksSentCount, setChunksSentCount] = useState(148);
+
+  // Bluetooth Protocol Logs
+  const [btLogs, setBtLogs] = useState<Array<{ id: number; time: string; text: string; type: 'tx' | 'rx' | 'sys' }>>([
+    { id: 1, time: '14:28:10', text: 'RX: CALL_INCOMING|101|Amina Mansouri|+212634934134|inwi', type: 'rx' },
+    { id: 2, time: '14:28:11', text: 'TX: CALL_ANSWER|101', type: 'tx' },
+    { id: 3, time: '14:28:12', text: 'RX: CALL_ACTIVE|101|inwi', type: 'rx' },
+    { id: 4, time: '14:32:22', text: 'RX: CALL_END|101', type: 'rx' },
+    { id: 5, time: '14:32:23', text: 'SYS: Appel enregistré dans l\'historique (04:12)', type: 'sys' },
+    { id: 6, time: '14:35:00', text: 'TX: AUDIO_START|8000|1|16|500', type: 'tx' },
+    { id: 7, time: '14:35:01', text: 'TX: AUDIO_CHUNK|UklGRi4AAABXQVZFZ... [8044 bytes WAV]', type: 'tx' }
   ]);
 
-  const addCallRecord = (
-    name: string, 
-    number: string, 
-    dir: 'incoming' | 'outgoing', 
-    durationStr: string, 
-    sim: string, 
-    status: 'answered' | 'missed' | 'rejected' = 'answered'
-  ) => {
-    const now = new Date();
-    const timeFormatted = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const newRecord: CallRecord = {
-      id: 'rec_' + Date.now(),
-      callerName: name,
-      phoneNumber: number,
-      timestamp: `Aujourd'hui, ${timeFormatted}`,
-      direction: dir,
-      duration: durationStr,
-      simName: sim,
-      status: status
-    };
-    setCallRecords(prev => [newRecord, ...prev]);
-  };
-  
-  // Call Duration Timer (00:00)
-  const [durationSeconds, setDurationSeconds] = useState<number>(0);
-
+  // Audio Chunk Simulator Timer
   useEffect(() => {
-    let interval: any = null;
-    if (callState === 'active') {
-      interval = setInterval(() => {
-        setDurationSeconds(sec => sec + 1);
+    if (!audioStreamingActive && !isPlaying) return;
+    const interval = setInterval(() => {
+      setChunksSentCount(prev => prev + 1);
+      if (isPlaying) {
+        setMediaProgress(prev => (prev >= 100 ? 0 : prev + 1));
+      }
+    }, 500); // 500ms audio chunks
+    return () => clearInterval(interval);
+  }, [audioStreamingActive, isPlaying]);
+
+  // In-call duration timer
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+    if (activeCall && activeCall.state === 'connected') {
+      timer = setInterval(() => {
+        setActiveCall(prev => {
+          if (!prev) return null;
+          return { ...prev, duration: prev.duration + 1 };
+        });
       }, 1000);
-    } else if (callState === 'idle') {
-      setDurationSeconds(0);
     }
     return () => {
-      if (interval) clearInterval(interval);
+      if (timer) clearInterval(timer);
     };
-  }, [callState]);
+  }, [activeCall?.state]);
 
-  const formatDuration = (sec: number) => {
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
-  };
-
-  // Logs
-  const [logs, setLogs] = useState<Array<{ time: string; dir: 'RX' | 'TX' | 'UI'; text: string }>>([
-    { time: '14:40:01', dir: 'TX', text: 'HELLO|BSB/1|BLACKBERRY_9790' },
-    { time: '14:40:01', dir: 'UI', text: 'SDP: Service 0x111E (Handsfree Unit) et 0x1108 (Headset) déclarés' },
-    { time: '14:40:02', dir: 'RX', text: 'SIM_LIST|2|inwi|0|Orange|1' },
-    { time: '14:40:02', dir: 'UI', text: 'Loaded 2 SIMs: [0] inwi, [1] Orange' },
-    { time: '14:40:03', dir: 'RX', text: 'AUDIO_STATUS|BLUETOOTH' },
-    { time: '14:40:03', dir: 'UI', text: 'Audio initial: Bluetooth / BlackBerry (Micro + Écouteur)' },
-  ]);
-
-  const addLog = (dir: 'RX' | 'TX' | 'UI', text: string) => {
+  const addLog = (text: string, type: 'tx' | 'rx' | 'sys') => {
     const time = new Date().toTimeString().split(' ')[0];
-    setLogs(prev => [ { time, dir, text }, ...prev.slice(0, 49) ]);
+    setBtLogs(prev => [...prev.slice(-30), { id: Date.now() + Math.random(), time, text, type }]);
   };
 
-  // Simulating incoming call from Android
-  const triggerIncomingCall = (simIdx: number = 0) => {
-    const chosenSim = sims[simIdx] || { name: 'inwi', slot: 0 };
-    const callId = 'call_' + Math.floor(1000 + Math.random() * 9000);
-    setCurrentCaller({
-      id: callId,
-      name: 'Hamza H.',
-      number: '+212611223344',
-      simName: chosenSim.name
+  // Dial / Initiate Outbound Call
+  const startCall = (number: string, contactName?: string, simOverride?: 'inwi' | 'Orange') => {
+    const targetNumber = number.trim();
+    if (!targetNumber) return;
+    const sim = simOverride || selectedSim;
+    const contact = contacts.find(c => c.number === targetNumber);
+    const displayName = contactName || contact?.name || targetNumber;
+
+    const newCallId = 'call_' + Date.now();
+    addLog(`TX: CALL_OUTBOUND|${targetNumber}|${sim === 'inwi' ? '0' : '1'}`, 'tx');
+
+    setActiveCall({
+      id: newCallId,
+      name: displayName,
+      number: targetNumber,
+      simName: sim,
+      isOutbound: true,
+      state: 'connected', // Connect immediately for smooth simulation
+      duration: 0,
+      speakerOn: true,
+      micMuted: false
     });
-    setCallState('incoming');
-    setSpeakerOn(false);
-    setAudioRoute('BLUETOOTH');
-    setDurationSeconds(0);
-    addLog('RX', `CALL_INCOMING|${callId}|Hamza H.|+212611223344|${chosenSim.name}`);
-    addLog('UI', `BlackBerry: Vibreur actif + Sonnerie d'appel continue sur [${chosenSim.name}]`);
+
+    addLog(`RX: CALL_OUTBOUND_OK|${targetNumber}|${sim}`, 'rx');
+    addLog(`RX: CALL_ACTIVE|${newCallId}|${sim}`, 'rx');
+    setDialerNumber('');
   };
 
-  // User answers on BlackBerry
-  const handleAnswer = () => {
-    setCallState('active');
-    setDurationSeconds(0);
-    addLog('TX', `CALL_ANSWER|${currentCaller.id}`);
-    addLog('RX', `CALL_ACTIVE|${currentCaller.id}|${currentCaller.simName}`);
-    addLog('UI', 'Chronomètre d\'appel démarré (00:00) - Bip de connexion');
-    addLog('UI', 'Canal vocal Bluetooth SCO ouvert vers le BlackBerry');
-  };
+  // Simulate Incoming Call
+  const simulateIncomingCall = (name = 'Dr. Karim Lahlou', number = '+212672409918', sim: 'inwi' | 'Orange' = 'Orange') => {
+    const newCallId = 'inc_' + Date.now();
+    addLog(`RX: CALL_INCOMING|${newCallId}|${name}|${number}|${sim}`, 'rx');
 
-  // User rejects on BlackBerry
-  const handleReject = () => {
-    setCallState('idle');
-    addLog('TX', `CALL_REJECT|${currentCaller.id}`);
-    addLog('UI', 'Appel rejeté - Popup fermée');
-    addCallRecord(currentCaller.name, currentCaller.number, 'incoming', 'Refusé', currentCaller.simName, 'rejected');
-  };
-
-  // Hangup from BlackBerry
-  const handleHangup = () => {
-    setCallState('ended');
-    addLog('TX', 'CALL_END');
-    addLog('RX', `CALL_END|${currentCaller.id}`);
-    addLog('UI', "Fin d'appel : Bip sonore BlackBerry Alert.startBuzzer(150) - Fermeture automatique dans 1.5s");
-    
-    // Determine call direction
-    const direction: 'incoming' | 'outgoing' = currentCaller.id.startsWith('out_') ? 'outgoing' : 'incoming';
-    const finalDuration = formatDuration(durationSeconds);
-    addCallRecord(currentCaller.name, currentCaller.number, direction, finalDuration, currentCaller.simName, 'answered');
-
-    setTimeout(() => {
-      setCallState('idle');
-      addLog('UI', 'PhoneCallScreen fermé - Retour à l\'écran principal');
-    }, 1500);
-  };
-
-  // Toggle smartphone speaker (SPEAKER_TOGGLE)
-  const handleToggleSpeaker = () => {
-    const nextState = !speakerOn;
-    addLog('TX', 'SPEAKER_TOGGLE');
-    setSpeakerOn(nextState);
-    addLog('RX', `SPEAKER_STATUS|${nextState ? 'ON' : 'OFF'}`);
-    addLog('UI', `Mains-libres Smartphone : ${nextState ? 'ACTIF' : 'INACTIF'}`);
-  };
-
-  // Toggle microphone mute (MUTE_TOGGLE)
-  const handleToggleMute = () => {
-    const nextState = !micMuted;
-    addLog('TX', 'MUTE_TOGGLE');
-    setMicMuted(nextState);
-    addLog('RX', `MUTE_STATUS|${nextState ? 'MUTED' : 'UNMUTED'}`);
-    addLog('UI', `Micro Smartphone : ${nextState ? 'MUTÉ' : 'ACTIF'}`);
-  };
-
-  const handleVolumeUp = () => {
-    addLog('TX', 'VOLUME_UP');
-    addLog('RX', 'VOLUME_OK|UP');
-    addLog('UI', 'Volume smartphone augmenté (+)');
-  };
-
-  const handleVolumeDown = () => {
-    addLog('TX', 'VOLUME_DOWN');
-    addLog('RX', 'VOLUME_OK|DOWN');
-    addLog('UI', 'Volume smartphone diminué (-)');
-  };
-
-  // Toggle audio playback streaming (YouTube / Music / Media)
-  const handleToggleAudioStreaming = () => {
-    if (isAudioStreaming) {
-      setIsAudioStreaming(false);
-      addLog('TX', 'AUDIO_PLAYBACK_STOP');
-      addLog('RX', 'AUDIO_STOP');
-      addLog('UI', 'Diffusion audio smartphone arrêtée (BluetoothAudioReceiver)');
-    } else {
-      setIsAudioStreaming(true);
-      addLog('TX', 'AUDIO_PLAYBACK_START');
-      addLog('RX', 'AUDIO_START|8000|1|16|200');
-      addLog('RX', 'AUDIO_CHUNK|<WAV 200ms Base64>');
-      addLog('UI', 'Diffusion audio smartphone active : double-lecteur ping-pong J2ME démarré (200ms)');
-    }
-  };
-
-  // Change Audio Route
-  const handleSelectAudioRoute = (route: AudioRoute) => {
-    setAudioChoiceModalOpen(false);
-    setAudioRoute(route);
-    addLog('TX', `AUDIO_ROUTE|${route}`);
-    addLog('RX', `AUDIO_STATUS|${route}`);
-    if (route === 'BLUETOOTH') {
-      addLog('UI', 'Audio commuté vers : BlackBerry (Microphone + Écouteur)');
-    } else if (route === 'SPEAKERPHONE') {
-      addLog('UI', 'Audio commuté vers : Haut-parleur du Smartphone Android');
-    } else {
-      addLog('UI', 'Audio commuté vers : Écouteur du Smartphone Android');
-    }
-  };
-
-  // Toggle local BlackBerry speaker / handset
-  const handleToggleLocalBbSpeaker = () => {
-    const nextState = !localBbSpeaker;
-    setLocalBbSpeaker(nextState);
-    addLog('UI', `Audio local BlackBerry (AudioPathControl) : ${nextState ? 'Haut-Parleur' : 'Combiné/Écouteur'}`);
-  };
-
-  // User initiates outbound call from BlackBerry
-  const startOutboundDial = () => {
-    if (sims.length >= 2) {
-      setSimChoiceModalOpen(true);
-    } else {
-      executeOutboundCall(sims[0]?.slot ?? 0, sims[0]?.name ?? 'inwi');
-    }
-  };
-
-  const executeOutboundCall = (slot: number, simName: string) => {
-    setSimChoiceModalOpen(false);
-    const callId = 'out_' + Date.now();
-    setCurrentCaller({
-      id: callId,
-      name: 'Youssef B.',
-      number: dialNumber,
-      simName: simName
+    setActiveCall({
+      id: newCallId,
+      name,
+      number,
+      simName: sim,
+      isOutbound: false,
+      state: 'ringing',
+      duration: 0,
+      speakerOn: true,
+      micMuted: false
     });
-    setCallState('outbound_dialing');
-    setSpeakerOn(false);
-    setAudioRoute('BLUETOOTH');
-    setDurationSeconds(0);
-    addLog('TX', `CALL_OUTBOUND|${dialNumber}|${slot}`);
-    addLog('RX', `CALL_OUTBOUND_OK|${dialNumber}|${simName}|${slot}`);
-    addLog('UI', `Écran appel sortant : "Numérotation sur [${simName}]..."`);
-
-    // Auto connect after 2.2s for demonstration
-    setTimeout(() => {
-      setCallState(curr => {
-        if (curr === 'outbound_dialing') {
-          addLog('RX', `CALL_ACTIVE|${callId}|${simName}`);
-          addLog('UI', 'Communication établie - Chronomètre actif');
-          return 'active';
-        }
-        return curr;
-      });
-    }, 2200);
   };
+
+  // Answer Call
+  const answerCall = () => {
+    if (!activeCall) return;
+    addLog(`TX: CALL_ANSWER|${activeCall.id}`, 'tx');
+    setActiveCall(prev => {
+      if (!prev) return null;
+      return { ...prev, state: 'connected', duration: 0 };
+    });
+    addLog(`RX: CALL_ACTIVE|${activeCall.id}|${activeCall.simName}`, 'rx');
+  };
+
+  // End / Reject Call & Save to REAL Call History
+  const endCall = () => {
+    if (!activeCall) return;
+    const isMissed = !activeCall.isOutbound && activeCall.state === 'ringing';
+    addLog(isMissed ? `TX: CALL_REJECT|${activeCall.id}` : `TX: CALL_END|${activeCall.id}`, 'tx');
+
+    const durationStr = isMissed 
+      ? 'Manqué' 
+      : `${String(Math.floor(activeCall.duration / 60)).padStart(2, '0')}:${String(activeCall.duration % 60).padStart(2, '0')}`;
+
+    const newRecord: CallRecord = {
+      id: 'rec_' + Date.now(),
+      callerName: activeCall.name,
+      phoneNumber: activeCall.number,
+      timestamp: 'À l\'instant',
+      direction: activeCall.isOutbound ? 'outgoing' : 'incoming',
+      duration: durationStr,
+      simName: activeCall.simName,
+      status: isMissed ? 'missed' : 'answered'
+    };
+
+    // Prepend to real call history!
+    setCallRecords(prev => [newRecord, ...prev]);
+    addLog(`SYS: Appel enregistré dans l'historique (${newRecord.direction === 'outgoing' ? 'Émis' : isMissed ? 'Manqué' : 'Reçu'} - ${durationStr})`, 'sys');
+
+    setActiveCall(prev => prev ? { ...prev, state: 'ended' } : null);
+    setTimeout(() => {
+      setActiveCall(null);
+    }, 1200);
+  };
+
+  // Toggle Mute / Speaker
+  const toggleMute = () => {
+    if (!activeCall) return;
+    const next = !activeCall.micMuted;
+    setActiveCall(prev => prev ? { ...prev, micMuted: next } : null);
+    addLog(`TX: MUTE_TOGGLE|${next ? '1' : '0'}`, 'tx');
+  };
+
+  const toggleSpeaker = () => {
+    if (!activeCall) return;
+    const next = !activeCall.speakerOn;
+    setActiveCall(prev => prev ? { ...prev, speakerOn: next } : null);
+    addLog(`TX: SPEAKER_TOGGLE|${next ? '1' : '0'}`, 'tx');
+  };
+
+  // Filtered Call History
+  const filteredHistory = callRecords.filter(record => {
+    if (historyFilter === 'outgoing' && record.direction !== 'outgoing') return false;
+    if (historyFilter === 'incoming' && (record.direction !== 'incoming' || record.status === 'missed')) return false;
+    if (historyFilter === 'missed' && record.status !== 'missed') return false;
+    if (historySearch.trim() !== '') {
+      const q = historySearch.toLowerCase();
+      return (
+        record.callerName.toLowerCase().includes(q) ||
+        record.phoneNumber.includes(q) ||
+        record.simName?.toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
 
   return (
-    <div className="min-h-screen bg-[#0d1117] text-gray-100 flex flex-col items-center justify-start p-3 sm:p-6 font-sans">
+    <div className="min-h-screen bg-[#0A0E14] text-white font-sans flex flex-col items-center justify-start p-2 sm:p-6 select-none">
       
-      {/* App Header */}
-      <header className="w-full max-w-6xl flex flex-wrap items-center justify-between pb-4 mb-4 border-b border-gray-800 gap-3">
+      {/* Top Main Navigation Bar */}
+      <header className="w-full max-w-6xl bg-[#11161F] border border-[#232F3E] rounded-2xl p-3 sm:p-4 mb-4 sm:mb-6 shadow-xl flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-cyan-600/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400">
-            <Bluetooth className="w-5 h-5 animate-pulse" />
+          <div className="relative">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-500 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+              <Smartphone className="w-5 h-5 text-white" />
+            </div>
+            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-green-500 border-2 border-[#11161F] rounded-full animate-pulse" />
           </div>
           <div>
-            <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white flex items-center gap-2">
-              BlackBerry SmartBridge <span className="text-xs px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">v1.4.0 Audio HFP & Double SIM</span>
-            </h1>
-            <p className="text-xs text-gray-400">
-              Profil Mains-Libres Bluetooth (HFP 0x111E), Micro/Écouteur BlackBerry, Double SIM et Routage Audio
+            <div className="flex items-center gap-2">
+              <h1 className="text-base sm:text-lg font-bold text-white tracking-wide">
+                BlackBerry Curve 9300 <span className="text-cyan-400 font-normal">Bridge</span>
+              </h1>
+              <span className="hidden sm:inline-block px-2 py-0.5 rounded text-[10px] font-mono bg-blue-500/20 text-blue-300 border border-blue-500/40">
+                RIM OS 5.0 - 7.1
+              </span>
+            </div>
+            <p className="text-xs text-gray-400 flex items-center gap-2">
+              <span>Pixel 7 Pro</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+              <span className="text-green-400">Bluetooth RFCOMM &amp; Audio SCO Connecté</span>
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 text-xs flex-wrap">
-          <button 
-            onClick={() => setCallHistoryModalOpen(true)}
-            className="px-2.5 py-1 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-md font-mono flex items-center gap-1.5 cursor-pointer transition-colors"
+        {/* Quick Access Action Buttons (Media, Contacts, Call History) */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Media Button */}
+          <button
+            onClick={() => {
+              setActiveTab('media');
+              setIsMediaModalOpen(true);
+            }}
+            className="px-3 py-2 rounded-xl bg-[#1B2230] hover:bg-[#232C3D] border border-purple-500/40 text-purple-300 text-xs font-semibold flex items-center gap-2 transition-all hover:scale-[1.02] cursor-pointer"
           >
-            <History className="w-3.5 h-3.5" />
-            Historique Appels ({callRecords.length})
+            <Music className="w-4 h-4 text-purple-400" />
+            <span>Média</span>
+            {isPlaying && (
+              <span className="w-2 h-2 rounded-full bg-green-400 animate-ping" />
+            )}
           </button>
-          <button 
-            onClick={() => setHfpGuideModalOpen(true)}
-            className="px-2.5 py-1 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 rounded-md font-mono flex items-center gap-1.5 cursor-pointer transition-colors"
+
+          {/* Contacts Button */}
+          <button
+            onClick={() => {
+              setActiveTab('contacts');
+              setIsContactsModalOpen(true);
+            }}
+            className="px-3 py-2 rounded-xl bg-[#1B2230] hover:bg-[#232C3D] border border-cyan-500/40 text-cyan-300 text-xs font-semibold flex items-center gap-2 transition-all hover:scale-[1.02] cursor-pointer"
           >
-            <HelpCircle className="w-3.5 h-3.5" />
-            Guide HFP / Audio
+            <Users className="w-4 h-4 text-cyan-400" />
+            <span>Contacts</span>
+            <span className="px-1.5 py-0.2 rounded-full bg-cyan-500/20 text-[10px] font-mono">
+              {contacts.length}
+            </span>
           </button>
-          <span className="px-2.5 py-1 bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 rounded-md font-mono flex items-center gap-1.5">
-            <Headphones className="w-3.5 h-3.5 text-cyan-400" />
-            HFP: SDP 0x111E
-          </span>
-          <span className="px-2.5 py-1 bg-green-500/10 text-green-400 border border-green-500/30 rounded-md font-mono flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-green-400 animate-ping"></span>
-            SPP: CONNECTÉ
-          </span>
+
+          {/* Call History Modal Button */}
+          <button
+            onClick={() => {
+              setActiveTab('calls');
+              setIsCallHistoryModalOpen(true);
+            }}
+            className="px-3 py-2 rounded-xl bg-[#1B2230] hover:bg-[#232C3D] border border-yellow-500/40 text-yellow-300 text-xs font-semibold flex items-center gap-2 transition-all hover:scale-[1.02] cursor-pointer"
+          >
+            <History className="w-4 h-4 text-yellow-400" />
+            <span>Journal</span>
+            <span className="px-1.5 py-0.2 rounded-full bg-yellow-500/20 text-[10px] font-mono">
+              {callRecords.length}
+            </span>
+          </button>
+
+          {/* Simulate Call Button */}
+          <button
+            onClick={() => simulateIncomingCall()}
+            className="px-3 py-2 rounded-xl bg-green-600 hover:bg-green-500 text-white text-xs font-semibold flex items-center gap-2 transition-all hover:scale-[1.02] cursor-pointer shadow-lg shadow-green-600/20"
+          >
+            <PhoneIncoming className="w-4 h-4 animate-bounce" />
+            <span className="hidden sm:inline">Simuler Appel</span>
+          </button>
         </div>
       </header>
 
-      {/* Main Grid: BB Device Emulator + Android Companion Controls */}
-      <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {/* Main Grid: Left Column = BlackBerry Curve 9300 Hardware & Emulation, Right Column = Control Station */}
+      <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
-        {/* LEFT COLUMN: BlackBerry Curve 9300 Screen Simulation (5 Cols) */}
+        {/* =============================================================== */}
+        {/* LEFT COLUMN: BlackBerry Curve 9300 Realistic Hardware Device   */}
+        {/* =============================================================== */}
         <div className="lg:col-span-5 flex flex-col items-center">
-          <div className="w-full max-w-[360px] bg-[#161a22] border-4 border-[#30363d] rounded-[36px] p-4 shadow-2xl relative flex flex-col items-center">
+          
+          {/* Curve 9300 Chassis / Outer Case */}
+          <div className="w-[360px] max-w-full bg-gradient-to-b from-[#1C1F26] via-[#12151B] to-[#0A0D12] p-4 rounded-[42px] border-[5px] border-[#2E3748] shadow-[0_20px_50px_rgba(0,0,0,0.8),inset_0_2px_4px_rgba(255,255,255,0.15)] flex flex-col items-center">
             
-            {/* Top Speaker Ear-piece & Status LED */}
-            <div className="w-full flex items-center justify-between px-6 mb-3">
-              <span className="text-[10px] tracking-widest text-gray-400 font-bold">BlackBerry</span>
-              <div className="w-16 h-1.5 bg-gray-700 rounded-full flex items-center justify-center">
-                <div className="w-6 h-0.5 bg-gray-900 rounded-full"></div>
+            {/* Top Earpiece Grill & Notification LED */}
+            <div className="w-full flex items-center justify-between px-6 pt-1 pb-3">
+              <div className="text-[10px] tracking-widest font-mono text-gray-500 uppercase font-black">
+                BlackBerry
               </div>
-              <div className={`w-2.5 h-2.5 rounded-full ${callState === 'incoming' ? 'bg-red-500 animate-ping' : callState === 'active' ? 'bg-green-400' : 'bg-green-500'}`}></div>
+              <div className="w-16 h-1.5 bg-[#080A0D] rounded-full border border-[#2D3748] shadow-inner" />
+              <div className={`w-2.5 h-2.5 rounded-full ${activeCall ? 'bg-red-500 animate-ping' : isPlaying ? 'bg-purple-500 animate-pulse' : 'bg-green-500'} shadow-[0_0_8px_currentColor]`} />
             </div>
 
-            {/* CURVE SCREEN (320x240 Aspect Ratio) */}
-            <div className="w-[320px] h-[240px] bg-black border-2 border-gray-800 rounded-md overflow-hidden relative font-mono text-xs select-none flex flex-col">
+            {/* LCD Screen Bezel (Curve 9300 320x240 Aspect Ratio) */}
+            <div className="w-[320px] h-[240px] bg-[#0A0E14] border-[3px] border-[#181D26] rounded-xl shadow-inner overflow-hidden flex flex-col relative font-sans">
               
-              {/* STATUS BAR */}
-              <div className="h-6 bg-[#111] border-b border-gray-800 flex items-center justify-between px-2 text-[10px] text-gray-300">
-                <span className="text-cyan-400 font-bold flex items-center gap-1">
-                  <Bluetooth className="w-3 h-3 text-cyan-400" />
-                  [HFP/SPP]
-                </span>
-                <span className="text-yellow-400 font-semibold">[4G] inwi - Signal: [||||]</span>
-                <span className="text-green-400">[BB: 88%]</span>
+              {/* Screen Top Status Bar (20px) */}
+              <div className="h-5 bg-[#05070B] border-b border-[#1E293B] px-2 flex items-center justify-between text-[10px] text-gray-300 shrink-0">
+                <div className="flex items-center gap-1.5">
+                  <Wifi className="w-2.5 h-2.5 text-cyan-400" />
+                  <span className="font-bold text-[9px] text-cyan-300">inwi | Orange</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {audioStreamingActive && (
+                    <span className="text-[8px] px-1 rounded bg-yellow-500/20 text-yellow-300 font-mono">SCO</span>
+                  )}
+                  <span className="text-[9px] font-mono text-gray-300">14:32</span>
+                  <div className="flex items-center text-green-400 gap-0.5">
+                    <span className="text-[9px]">88%</span>
+                    <Battery className="w-3 h-3" />
+                  </div>
+                </div>
               </div>
 
-              {/* SCREEN CONTENT BY CALL STATE */}
-              {callState === 'idle' && (
-                <div className="flex-1 flex flex-col justify-between p-2">
-                  <div className="text-center pt-1">
-                    <div className="text-2xl font-bold tracking-wider text-white">14:42</div>
-                    <div className="text-[10px] text-gray-400">Jeudi 24 Septembre 2026</div>
-                    <div className="text-[11px] text-cyan-400 mt-0.5">
-                      Double SIM Active : [{sims.map(s => s.name).join(' | ')}]
-                    </div>
-                    <div className="text-[9px] text-green-400 flex items-center justify-center gap-1 mt-0.5">
-                      <Mic className="w-2.5 h-2.5" />
-                      Audio Mains-Libres Prêt (SCO)
-                    </div>
-                  </div>
-
-                  {/* 3x3 Grid Buttons Preview */}
-                  <div className="grid grid-cols-3 gap-1 px-1">
-                    <button onClick={startOutboundDial} className="bg-[#222] hover:bg-[#333] border border-cyan-800 text-cyan-300 py-1 rounded text-[10px] font-bold text-center cursor-pointer">
-                      📞 Calls
-                    </button>
-                    <button onClick={() => setCallHistoryModalOpen(true)} className="bg-[#222] hover:bg-[#333] border border-cyan-700 text-cyan-300 py-1 rounded text-[10px] font-bold text-center cursor-pointer">
-                      📜 History
-                    </button>
-                    <button className="bg-[#222] border border-gray-700 text-gray-300 py-1 rounded text-[10px] text-center">
-                      ✉️ Messages
-                    </button>
-                    <button className="bg-[#222] border border-gray-700 text-gray-300 py-1 rounded text-[10px] text-center">
-                      🔔 Notifs (2)
-                    </button>
-                    <button className="bg-[#222] border border-gray-700 text-gray-300 py-1 rounded text-[10px] text-center">
-                      💬 WhatsApp
-                    </button>
-                    <button onClick={() => setHfpGuideModalOpen(true)} className="bg-[#222] border border-yellow-700 text-yellow-300 py-1 rounded text-[10px] text-center cursor-pointer">
-                      🎧 Audio HFP
-                    </button>
-                  </div>
-
-                  <div className="text-[9px] text-gray-500 text-center">
-                    Touche Verte pour composer | Menu pour options HFP
-                  </div>
-                </div>
-              )}
-
-              {/* INCOMING CALL MODAL POPUP */}
-              {callState === 'incoming' && (
-                <div className="flex-1 bg-black flex flex-col justify-between p-2 text-center animate-pulse">
-                  <div>
-                    <div className="text-sm font-bold text-green-400 uppercase tracking-wider">
-                      APPEL ENTRANT...
-                    </div>
-                    <div className="text-xs font-bold text-yellow-400">
-                      sur [{currentCaller.simName}]
-                    </div>
-                    <div className="w-full h-[1px] bg-gray-800 my-1"></div>
-                  </div>
-
-                  <div>
-                    <div className="text-lg font-bold text-white leading-tight">
-                      {currentCaller.name}
-                    </div>
-                    <div className="text-xs text-gray-400">
-                      {currentCaller.number}
-                    </div>
-                    <div className="text-xs text-yellow-500 font-bold mt-1">
-                      Sonnerie & Vibreur en cours...
-                    </div>
-                    <div className="text-[10px] text-cyan-400 mt-0.5">
-                      [Audio : Micro & Écouteur BlackBerry]
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-center gap-2 mb-1">
-                      <button 
-                        onClick={handleAnswer} 
-                        className="px-4 py-1.5 bg-green-700 hover:bg-green-600 text-white font-bold rounded-lg text-xs cursor-pointer border border-green-400 shadow"
-                      >
-                        Décrocher
-                      </button>
-                      <button 
-                        onClick={handleReject} 
-                        className="px-4 py-1.5 bg-red-700 hover:bg-red-600 text-white font-bold rounded-lg text-xs cursor-pointer border border-red-400 shadow"
-                      >
-                        Refuser
-                      </button>
-                    </div>
-                    <div className="text-[8px] text-gray-400">
-                      Touche Verte: Décrocher | Rouge / Échap: Refuser
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* OUTBOUND OR ACTIVE CALL SCREEN */}
-              {(callState === 'outbound_dialing' || callState === 'active' || callState === 'ended') && (
-                <div className="flex-1 bg-black flex flex-col justify-between p-2 text-center select-none">
-                  {/* Titre : Appel en cours [SIM: ...] */}
-                  <div>
-                    <div className={`text-xs font-bold uppercase tracking-wider ${
-                      callState === 'ended' ? 'text-red-500' : 'text-cyan-400'
-                    }`}>
-                      {callState === 'ended' ? 'APPEL TERMINÉ' : `Appel en cours [SIM: ${currentCaller.simName}]`}
-                    </div>
-                    <div className="w-full h-[1px] bg-cyan-900/40 my-1"></div>
-                  </div>
-
-                  <div className="py-0.5 space-y-0.5">
-                    {/* Nom du contact en grand (Font Bold 22pt) */}
-                    <div className="text-xl font-bold text-white tracking-wide leading-tight drop-shadow">
-                      {currentCaller.name}
-                    </div>
-                    {/* Numéro en dessous (Font Normal 16pt) */}
-                    <div className="text-sm text-gray-300 font-mono">
-                      {currentCaller.number}
-                    </div>
-
-                    {/* Durée : "00:00" incrémentée chaque seconde dès réception de CALL_ACTIVE */}
-                    <div className={`text-lg font-bold font-mono tracking-wider ${
-                      callState === 'ended' ? 'text-red-400' : 'text-emerald-400'
-                    }`}>
-                      {callState === 'ended' ? '00:00' : (callState === 'active' ? formatDuration(durationSeconds) : '--:--')}
-                    </div>
-
-                    {/* Statut : "Mains-libres smartphone : ACTIF" */}
-                    <div className={`text-xs font-bold transition-colors ${
-                      callState === 'ended' 
-                        ? 'text-red-500' 
-                        : speakerOn ? 'text-cyan-300' : 'text-gray-400'
-                    }`}>
-                      {callState === 'ended' 
-                        ? 'Appel terminé' 
-                        : `Mains-libres smartphone : ${speakerOn ? 'ACTIF' : 'INACTIF'}`}
-                    </div>
-
-                    {/* Indicateur Micro */}
-                    {callState !== 'ended' && (
-                      <div className={`text-[10px] font-semibold ${micMuted ? 'text-amber-400' : 'text-sky-400'}`}>
-                        {micMuted ? 'Micro smartphone : MUTÉ' : 'Micro smartphone : ACTIF'}
+              {/* LCD Screen Content Area */}
+              <div className="flex-1 p-2 flex flex-col justify-between overflow-hidden">
+                
+                {/* Condition 1: Active Call Overlay on Curve 9300 */}
+                {activeCall ? (
+                  <div className="flex-1 flex flex-col justify-between items-center text-center animate-in fade-in duration-200">
+                    <div>
+                      <div className={`text-[10px] font-bold uppercase tracking-wider ${activeCall.state === 'ringing' ? 'text-green-400 animate-pulse' : 'text-cyan-400'}`}>
+                        {activeCall.state === 'ringing' ? '🔔 APPEL ENTRANT' : '📞 APPEL EN COURS'} [{activeCall.simName}]
                       </div>
-                    )}
-                  </div>
+                      <div className="text-sm font-bold text-white mt-0.5 truncate max-w-[280px]">
+                        {activeCall.name}
+                      </div>
+                      <div className="text-[11px] font-mono text-gray-400">
+                        {activeCall.number}
+                      </div>
+                    </div>
 
-                  {/* ACTION BUTTONS & TOUCH CONTROLS */}
-                  <div className="space-y-1">
-                    {callState !== 'ended' ? (
-                      <div className="flex justify-center items-center gap-1.5">
-                        <button 
-                          onClick={handleHangup} 
-                          title="Touche Rouge / KEY_END"
-                          className="px-2.5 py-1 bg-red-950/80 hover:bg-red-800 text-red-200 font-bold rounded text-xs cursor-pointer border border-red-500/80 shadow transition active:scale-95"
-                        >
-                          Raccrocher
-                        </button>
-                        <button 
-                          onClick={handleToggleMute} 
-                          title="Touche Espace / Clic Trackpad"
-                          className={`px-2 py-1 font-bold rounded text-xs cursor-pointer border transition active:scale-95 ${
-                            micMuted 
-                              ? 'bg-amber-950/80 border-amber-500 text-amber-200' 
-                              : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-500'
-                          }`}
-                        >
-                          {micMuted ? 'Micro: OFF' : 'Micro: ON'}
-                        </button>
-                        <button 
-                          onClick={handleToggleSpeaker} 
-                          title="Touche M"
-                          className={`px-2 py-1 font-bold rounded text-xs cursor-pointer border transition active:scale-95 ${
-                            speakerOn 
-                              ? 'bg-cyan-950/80 border-cyan-400 text-cyan-200' 
-                              : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-500'
-                          }`}
-                        >
-                          {speakerOn ? 'HP: ON' : 'HP: OFF'}
-                        </button>
-                        <div className="flex flex-col gap-0.5">
-                          <button 
-                            onClick={handleVolumeUp}
-                            className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-cyan-300 text-[10px] font-bold rounded"
-                            title="Volume +"
+                    {/* Timer / Ringing status */}
+                    <div className="my-1 py-1 px-3 bg-[#11161F] border border-cyan-500/30 rounded-lg">
+                      <span className="text-lg font-mono font-bold text-cyan-300">
+                        {activeCall.state === 'ringing' 
+                          ? 'Sonnerie...' 
+                          : `${String(Math.floor(activeCall.duration / 60)).padStart(2, '0')}:${String(activeCall.duration % 60).padStart(2, '0')}`}
+                      </span>
+                    </div>
+
+                    {/* Hardware Buttons on screen */}
+                    <div className="flex items-center gap-2 w-full justify-center">
+                      {activeCall.state === 'ringing' ? (
+                        <>
+                          <button
+                            onClick={answerCall}
+                            className="px-3 py-1 bg-green-700 hover:bg-green-600 text-white rounded text-[10px] font-bold flex items-center gap-1 cursor-pointer"
                           >
-                            +
+                            <Phone className="w-3 h-3" /> Décrocher
                           </button>
-                          <button 
-                            onClick={handleVolumeDown}
-                            className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-cyan-300 text-[10px] font-bold rounded"
-                            title="Volume -"
+                          <button
+                            onClick={endCall}
+                            className="px-3 py-1 bg-red-700 hover:bg-red-600 text-white rounded text-[10px] font-bold flex items-center gap-1 cursor-pointer"
                           >
-                            -
+                            <PhoneOff className="w-3 h-3" /> Refuser
                           </button>
-                        </div>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={toggleMute}
+                            className={`px-2 py-1 rounded text-[9px] font-medium border ${activeCall.micMuted ? 'bg-amber-600 text-white border-amber-400' : 'bg-gray-800 text-gray-300 border-gray-700'}`}
+                          >
+                            {activeCall.micMuted ? 'Micro Muté' : 'Micro Actif'}
+                          </button>
+                          <button
+                            onClick={toggleSpeaker}
+                            className={`px-2 py-1 rounded text-[9px] font-medium border ${activeCall.speakerOn ? 'bg-cyan-700 text-white border-cyan-400' : 'bg-gray-800 text-gray-300 border-gray-700'}`}
+                          >
+                            {activeCall.speakerOn ? 'HP Actif' : 'Écouteur'}
+                          </button>
+                          <button
+                            onClick={endCall}
+                            className="px-3 py-1 bg-red-700 hover:bg-red-600 text-white rounded text-[10px] font-bold cursor-pointer"
+                          >
+                            Raccrocher
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  /* Condition 2: Regular Curve 9300 Home Screen */
+                  <div className="flex-1 flex flex-col justify-between">
+                    {/* Clock & Status */}
+                    <div className="text-center pt-1">
+                      <div className="text-2xl font-bold font-mono tracking-tight text-white leading-none">
+                        14:32
                       </div>
-                    ) : (
-                      <div className="text-xs text-red-400 py-1 font-bold animate-pulse">
-                        Bip de fin Alert.startBuzzer(150)... Fermeture auto
+                      <div className="text-[10px] text-gray-400 mt-0.5">
+                        Mardi 24 Septembre 2026
                       </div>
-                    )}
+                      <div className="text-[9px] text-cyan-400 font-medium">
+                        Double SIM Active : [inwi | Orange]
+                      </div>
+                    </div>
 
-                    <div className="text-[9px] text-gray-500">
-                      [Fin: Rouge | Espace: Mute | M: HP | Vol: Côté Droit]
+                    {/* 3x2 Grid Buttons (Exact replica of SmartBridgeScreen.java) */}
+                    <div className="grid grid-cols-3 gap-1.5 px-1 py-1">
+                      {/* Appels Button -> Opens Dialer & Call History */}
+                      <button
+                        onClick={() => setActiveTab('calls')}
+                        className={`p-1.5 rounded-lg border text-center transition-colors cursor-pointer ${
+                          activeTab === 'calls' 
+                            ? 'bg-cyan-900/60 border-cyan-400 text-white' 
+                            : 'bg-[#151D28] border-cyan-800/40 text-cyan-300 hover:bg-cyan-900/40'
+                        }`}
+                      >
+                        <PhoneCall className="w-3.5 h-3.5 mx-auto mb-0.5 text-cyan-400" />
+                        <span className="text-[9px] font-bold block leading-tight">Appels</span>
+                        <span className="text-[7px] text-gray-400 block">&amp; Journal</span>
+                      </button>
+
+                      {/* Contacts Button */}
+                      <button
+                        onClick={() => {
+                          setActiveTab('contacts');
+                          setIsContactsModalOpen(true);
+                        }}
+                        className={`p-1.5 rounded-lg border text-center transition-colors cursor-pointer ${
+                          activeTab === 'contacts' 
+                            ? 'bg-cyan-900/60 border-cyan-400 text-white' 
+                            : 'bg-[#151D28] border-cyan-800/40 text-cyan-300 hover:bg-cyan-900/40'
+                        }`}
+                      >
+                        <User className="w-3.5 h-3.5 mx-auto mb-0.5 text-cyan-400" />
+                        <span className="text-[9px] font-bold block leading-tight">Contacts</span>
+                        <span className="text-[7px] text-cyan-400 font-mono block">VIP ({contacts.length})</span>
+                      </button>
+
+                      {/* Média Button */}
+                      <button
+                        onClick={() => {
+                          setActiveTab('media');
+                          setIsMediaModalOpen(true);
+                        }}
+                        className={`p-1.5 rounded-lg border text-center transition-colors cursor-pointer ${
+                          activeTab === 'media' 
+                            ? 'bg-purple-900/60 border-purple-400 text-white' 
+                            : 'bg-[#151D28] border-purple-800/40 text-purple-300 hover:bg-purple-900/40'
+                        }`}
+                      >
+                        <Music className="w-3.5 h-3.5 mx-auto mb-0.5 text-purple-400" />
+                        <span className="text-[9px] font-bold block leading-tight">Média</span>
+                        <span className="text-[7px] text-gray-400 block">{isPlaying ? 'Lecture' : 'Pause'}</span>
+                      </button>
+
+                      {/* Messages Button */}
+                      <button
+                        onClick={() => addLog('TX: OPEN_APP|Messages', 'tx')}
+                        className="p-1.5 rounded-lg bg-[#151D28] border border-gray-700 text-gray-300 hover:bg-gray-800 text-center cursor-pointer"
+                      >
+                        <Send className="w-3.5 h-3.5 mx-auto mb-0.5 text-gray-400" />
+                        <span className="text-[9px] font-medium block leading-tight">Messages</span>
+                        <span className="text-[7px] text-gray-500 block">SMS / WA</span>
+                      </button>
+
+                      {/* Notifs Button */}
+                      <button
+                        onClick={() => addLog('TX: GET_NOTIFICATIONS', 'tx')}
+                        className="p-1.5 rounded-lg bg-[#151D28] border border-gray-700 text-gray-300 hover:bg-gray-800 text-center cursor-pointer"
+                      >
+                        <Radio className="w-3.5 h-3.5 mx-auto mb-0.5 text-amber-400" />
+                        <span className="text-[9px] font-medium block leading-tight">Notifs</span>
+                        <span className="text-[7px] text-amber-400 block">2 actives</span>
+                      </button>
+
+                      {/* Audio Stream Button */}
+                      <button
+                        onClick={() => {
+                          const next = !audioStreamingActive;
+                          setAudioStreamingActive(next);
+                          addLog(next ? 'TX: AUDIO_START|8000|1|16|500' : 'TX: AUDIO_STOP', 'tx');
+                        }}
+                        className={`p-1.5 rounded-lg border text-center transition-colors cursor-pointer ${
+                          audioStreamingActive 
+                            ? 'bg-amber-900/40 border-amber-500/80 text-amber-200' 
+                            : 'bg-[#151D28] border-gray-700 text-gray-400'
+                        }`}
+                      >
+                        <Volume2 className="w-3.5 h-3.5 mx-auto mb-0.5 text-amber-400" />
+                        <span className="text-[9px] font-bold block leading-tight">Audio SCO</span>
+                        <span className="text-[7px] font-mono block">{audioStreamingActive ? '500ms WAV' : 'Inactif'}</span>
+                      </button>
+                    </div>
+
+                    {/* Bottom Hint */}
+                    <div className="text-[8px] text-gray-500 text-center pb-0.5">
+                      Touche Verte: Appels &amp; Journal | Menu: Options
                     </div>
                   </div>
-                </div>
-              )}
-
-              {/* POPUP SIM SELECTION DIALOG (CURVE MODAL) */}
-              {simChoiceModalOpen && (
-                <div className="absolute inset-0 bg-black/85 backdrop-blur-xs flex items-center justify-center p-3 z-20">
-                  <div className="w-full bg-[#1e232b] border border-cyan-500/60 rounded-lg p-2.5 text-center shadow-2xl">
-                    <div className="text-xs font-bold text-white mb-2">
-                      Appeler {dialNumber} avec :
-                    </div>
-                    <div className="space-y-1.5">
-                      {sims.map(sim => (
-                        <button
-                          key={sim.slot}
-                          onClick={() => executeOutboundCall(sim.slot, sim.name)}
-                          className="w-full py-1 px-2 bg-cyan-900/40 hover:bg-cyan-700 text-cyan-200 text-xs font-bold rounded border border-cyan-600/50 flex items-center justify-between cursor-pointer"
-                        >
-                          <span>Option {sim.slot + 1} :</span>
-                          <span className="text-yellow-400 font-bold">{sim.name} (Slot {sim.slot})</span>
-                        </button>
-                      ))}
-                      <button
-                        onClick={() => setSimChoiceModalOpen(false)}
-                        className="w-full py-1 text-[10px] text-gray-400 hover:text-white mt-1 cursor-pointer"
-                      >
-                        Annuler (Touche Échap)
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* POPUP AUDIO ROUTE DIALOG (CURVE MODAL) */}
-              {audioChoiceModalOpen && (
-                <div className="absolute inset-0 bg-black/85 backdrop-blur-xs flex items-center justify-center p-2 z-20">
-                  <div className="w-full bg-[#1e232b] border border-cyan-500/60 rounded-lg p-2 text-center shadow-2xl">
-                    <div className="text-[11px] font-bold text-white mb-1.5">
-                      Choisir la sortie audio :
-                    </div>
-                    <div className="space-y-1 text-[10px]">
-                      <button
-                        onClick={() => handleSelectAudioRoute('BLUETOOTH')}
-                        className={`w-full py-1 px-2 text-left rounded border flex items-center justify-between cursor-pointer ${
-                          audioRoute === 'BLUETOOTH' ? 'bg-cyan-700 text-white border-cyan-400' : 'bg-gray-800 text-gray-300 border-gray-700'
-                        }`}
-                      >
-                        <span>1: Bluetooth / BlackBerry</span>
-                        <Headphones className="w-3 h-3 text-cyan-300" />
-                      </button>
-                      <button
-                        onClick={() => handleSelectAudioRoute('SPEAKERPHONE')}
-                        className={`w-full py-1 px-2 text-left rounded border flex items-center justify-between cursor-pointer ${
-                          audioRoute === 'SPEAKERPHONE' ? 'bg-amber-800 text-white border-amber-400' : 'bg-gray-800 text-gray-300 border-gray-700'
-                        }`}
-                      >
-                        <span>2: Haut-parleur Smartphone</span>
-                        <Volume2 className="w-3 h-3 text-amber-300" />
-                      </button>
-                      <button
-                        onClick={() => handleSelectAudioRoute('EARPIECE')}
-                        className={`w-full py-1 px-2 text-left rounded border flex items-center justify-between cursor-pointer ${
-                          audioRoute === 'EARPIECE' ? 'bg-blue-800 text-white border-blue-400' : 'bg-gray-800 text-gray-300 border-gray-700'
-                        }`}
-                      >
-                        <span>3: Écouteur Smartphone</span>
-                        <Smartphone className="w-3 h-3 text-blue-300" />
-                      </button>
-                      <button
-                        onClick={handleToggleLocalBbSpeaker}
-                        className="w-full py-1 px-2 text-left bg-gray-900 text-green-300 rounded border border-green-800/60 flex items-center justify-between cursor-pointer"
-                      >
-                        <span>4: Basculer HP/Combiné BB</span>
-                        <span className="text-[9px] font-mono">{localBbSpeaker ? 'HP' : 'Combiné'}</span>
-                      </button>
-                      <button
-                        onClick={handleToggleAudioStreaming}
-                        className={`w-full py-1 px-2 text-left rounded border flex items-center justify-between cursor-pointer transition ${
-                          isAudioStreaming ? 'bg-purple-900/80 text-purple-200 border-purple-400' : 'bg-gray-800 text-gray-300 border-gray-700 hover:border-purple-400'
-                        }`}
-                      >
-                        <span>{isAudioStreaming ? '5: Couper Audio Smartphone' : '5: Écouter Audio Smartphone (WAV 200ms)'}</span>
-                        <Radio className={`w-3 h-3 ${isAudioStreaming ? 'text-purple-300 animate-pulse' : 'text-gray-400'}`} />
-                      </button>
-                      <button
-                        onClick={() => setAudioChoiceModalOpen(false)}
-                        className="w-full py-0.5 text-[9px] text-gray-400 hover:text-white cursor-pointer"
-                      >
-                        Fermer (Touche Échap)
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
+                )}
+              </div>
             </div>
 
-            {/* CURVE TRACKPAD & HARDWARE BUTTONS */}
-            <div className="w-[320px] flex items-center justify-between px-4 mt-3">
+            {/* Hardware Keypad Row: Green Send, Menu, Optical Trackpad, Escape, Red End */}
+            <div className="w-[320px] flex items-center justify-between px-2 pt-3 pb-2">
+              {/* Green Send Key */}
               <button 
                 onClick={() => {
-                  if (callState === 'incoming') handleAnswer();
-                  else if (callState === 'idle') startOutboundDial();
-                  else if (callState === 'active') setAudioChoiceModalOpen(true);
-                }} 
-                className="w-10 h-7 bg-green-700 hover:bg-green-600 rounded-lg text-white text-[11px] font-bold shadow flex items-center justify-center cursor-pointer"
-                title="Touche Verte (Send)"
+                  if (activeCall && activeCall.state === 'ringing') answerCall();
+                  else setActiveTab('calls');
+                }}
+                className="w-12 h-8 rounded-lg bg-[#112415] hover:bg-[#1a3a22] border border-green-600/70 text-green-400 flex items-center justify-center cursor-pointer shadow-md active:scale-95 transition-all"
+                title="Touche Verte (Appels / Décrocher)"
               >
-                📞
+                <Phone className="w-4 h-4" />
               </button>
+
+              {/* BlackBerry Menu Key */}
               <button 
-                onClick={() => setAudioChoiceModalOpen(true)}
-                className="w-8 h-7 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-300 text-[10px] font-bold cursor-pointer"
-                title="Touche Menu"
+                onClick={() => setIsCallHistoryModalOpen(true)}
+                className="w-10 h-8 rounded-lg bg-[#1A1F29] hover:bg-[#252C3A] border border-[#333E52] text-gray-300 flex items-center justify-center cursor-pointer shadow-md active:scale-95 transition-all"
+                title="Touche Menu BlackBerry"
               >
-                MENU
+                <Layers className="w-4 h-4 text-cyan-400" />
               </button>
+
               {/* Optical Trackpad */}
               <div 
                 onClick={() => {
-                  if (callState === 'active') setAudioChoiceModalOpen(true);
+                  if (activeCall) toggleMute();
+                  else setIsMediaModalOpen(true);
                 }}
-                className="w-10 h-10 rounded-full bg-black border-2 border-gray-600 shadow-inner flex items-center justify-center cursor-pointer hover:border-cyan-400"
-                title="Trackpad optique Curve (Clic)"
+                className="w-11 h-9 rounded-xl bg-gradient-to-b from-[#0F1318] to-[#040608] border-2 border-cyan-500/60 shadow-[0_0_10px_rgba(6,182,212,0.3)] flex items-center justify-center cursor-pointer active:scale-90 transition-transform"
+                title="Trackpad Optique BlackBerry"
               >
-                <div className="w-3.5 h-3.5 rounded-full bg-gray-500"></div>
+                <div className="w-4 h-3 rounded-full bg-cyan-400/30 border border-cyan-400/50" />
               </div>
+
+              {/* Escape / Back Key */}
               <button 
                 onClick={() => {
-                  setAudioChoiceModalOpen(false);
-                  setSimChoiceModalOpen(false);
+                  if (activeCall) endCall();
+                  else setActiveTab('calls');
                 }}
-                className="w-8 h-7 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-300 text-[10px] font-bold cursor-pointer"
-                title="Touche Échap / Retour"
+                className="w-10 h-8 rounded-lg bg-[#1A1F29] hover:bg-[#252C3A] border border-[#333E52] text-gray-300 flex items-center justify-center cursor-pointer shadow-md active:scale-95 transition-all"
+                title="Touche Retour / Échap"
               >
-                ESC
+                <X className="w-4 h-4 text-gray-400" />
               </button>
+
+              {/* Red End Call Key */}
               <button 
-                onClick={() => {
-                  if (callState === 'incoming') handleReject();
-                  else if (callState !== 'idle') handleHangup();
-                }} 
-                className="w-10 h-7 bg-red-700 hover:bg-red-600 rounded-lg text-white text-[11px] font-bold shadow flex items-center justify-center cursor-pointer"
-                title="Touche Rouge (End / Hangup)"
-              >
-                🔴
-              </button>
-            </div>
-
-            {/* Physical QWERTY Keyboard hint */}
-            <div className="w-full flex justify-center mt-2">
-              <span className="text-[9px] text-gray-500 font-mono">Clavier physique Curve 9300 actif</span>
-            </div>
-          </div>
-        </div>
-
-        {/* RIGHT COLUMN: Android Test Bench & Bluetooth Protocol Inspector (7 Cols) */}
-        <div className="lg:col-span-7 flex flex-col gap-4">
-          
-          {/* Card 1: Audio Routing & Handsfree HFP Control */}
-          <div className="bg-[#161a22] border border-cyan-800/60 rounded-xl p-4 shadow-sm relative overflow-hidden">
-            <div className="absolute top-0 right-0 px-3 py-1 bg-cyan-600/20 text-cyan-400 text-[10px] font-mono rounded-bl-lg border-b border-l border-cyan-500/30">
-              AUDIO VOIX (SCO / HFP)
-            </div>
-
-            <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-2">
-              <Headphones className="w-4 h-4 text-cyan-400" />
-              1. Routage Audio Téléphonie & Micro/Écouteur
-            </h2>
-            <p className="text-xs text-gray-400 mb-3">
-              Contrôlez où transite la voix en temps réel (BlackBerry Curve vs Haut-parleur / Écouteur Android).
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs mb-3">
-              <button
-                onClick={() => handleSelectAudioRoute('BLUETOOTH')}
-                className={`p-2.5 rounded-lg border flex flex-col items-center gap-1.5 cursor-pointer text-center ${
-                  audioRoute === 'BLUETOOTH' ? 'bg-cyan-950/80 border-cyan-400 text-cyan-200' : 'bg-gray-900 border-gray-800 text-gray-400 hover:bg-gray-800'
-                }`}
-              >
-                <Headphones className="w-4 h-4 text-cyan-400" />
-                <span className="font-bold text-[11px]">Audio Bluetooth / BB</span>
-                <span className="text-[9px] text-gray-400">Micro & HP Curve</span>
-              </button>
-
-              <button
-                onClick={() => handleSelectAudioRoute('SPEAKERPHONE')}
-                className={`p-2.5 rounded-lg border flex flex-col items-center gap-1.5 cursor-pointer text-center ${
-                  audioRoute === 'SPEAKERPHONE' ? 'bg-amber-950/80 border-amber-400 text-amber-200' : 'bg-gray-900 border-gray-800 text-gray-400 hover:bg-gray-800'
-                }`}
-              >
-                <Volume2 className="w-4 h-4 text-amber-400" />
-                <span className="font-bold text-[11px]">HP Smartphone</span>
-                <span className="text-[9px] text-gray-400">Haut-parleur Android</span>
-              </button>
-
-              <button
-                onClick={() => handleSelectAudioRoute('EARPIECE')}
-                className={`p-2.5 rounded-lg border flex flex-col items-center gap-1.5 cursor-pointer text-center ${
-                  audioRoute === 'EARPIECE' ? 'bg-blue-950/80 border-blue-400 text-blue-200' : 'bg-gray-900 border-gray-800 text-gray-400 hover:bg-gray-800'
-                }`}
-              >
-                <Smartphone className="w-4 h-4 text-blue-400" />
-                <span className="font-bold text-[11px]">Écouteur Smartphone</span>
-                <span className="text-[9px] text-gray-400">Combiné Android</span>
-              </button>
-            </div>
-
-            {/* Audio Signal Flow Diagram */}
-            <div className="bg-[#0d1117] p-2.5 rounded-lg border border-gray-800 text-[11px] font-mono space-y-1">
-              <div className="text-gray-400 font-bold flex items-center justify-between">
-                <span>Flux Audio SCO Bidirectionnel :</span>
-                <span className="text-cyan-400 font-bold">Profil HFP v1.5</span>
-              </div>
-              <div className="text-gray-300 flex items-center gap-1 text-[10px]">
-                <Mic className="w-3 h-3 text-red-400" />
-                <span>Micro BlackBerry ➔ Voix transmise à l'interlocuteur via SCO</span>
-              </div>
-              <div className="text-gray-300 flex items-center gap-1 text-[10px]">
-                <Headphones className="w-3 h-3 text-cyan-400" />
-                <span>Interlocuteur ➔ Entendu dans {audioRoute === 'BLUETOOTH' ? "l'écouteur du BlackBerry Curve" : audioRoute}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 2: Double SIM & Outbound Controls */}
-          <div className="bg-[#161a22] border border-gray-800 rounded-xl p-4 shadow-sm">
-            <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-3">
-              <SimIcon className="w-4 h-4 text-cyan-400" />
-              2. Configuration Double SIM & Appels Sortants
-            </h2>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div className="bg-[#0d1117] p-2.5 rounded-lg border border-gray-800">
-                <span className="text-gray-400 block mb-1">Cartes SIM reçues via Bluetooth :</span>
-                <div className="space-y-1.5">
-                  {sims.map((sim, i) => (
-                    <div key={sim.slot} className="flex items-center justify-between bg-gray-900 px-2.5 py-1.5 rounded border border-gray-800">
-                      <span className="font-semibold text-yellow-400">SIM {i + 1} : {sim.name}</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-300 font-mono">Slot {sim.slot}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="bg-[#0d1117] p-2.5 rounded-lg border border-gray-800 flex flex-col justify-between">
-                <div>
-                  <span className="text-gray-400 block mb-1">Numéro à appeler depuis le BlackBerry :</span>
-                  <input
-                    type="text"
-                    value={dialNumber}
-                    onChange={(e) => setDialNumber(e.target.value)}
-                    className="w-full bg-[#161a22] border border-gray-700 rounded px-2.5 py-1.5 text-xs text-white font-mono"
-                    placeholder="+212634934134"
-                  />
-                </div>
-                <button
-                  onClick={startOutboundDial}
-                  className="w-full mt-2 py-1.5 bg-cyan-700 hover:bg-cyan-600 text-white rounded font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow"
-                >
-                  <Phone className="w-3.5 h-3.5" />
-                  Appeler (Déclenche sélecteur SIM)
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 3: Incoming Call Simulation */}
-          <div className="bg-[#161a22] border border-gray-800 rounded-xl p-4 shadow-sm">
-            <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-2">
-              <PhoneIncoming className="w-4 h-4 text-green-400" />
-              3. Déclencheur d'Événements Android vers BlackBerry
-            </h2>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-              <button
-                onClick={() => triggerIncomingCall(0)}
-                className="p-2 bg-green-950/40 hover:bg-green-900/60 border border-green-700/50 rounded text-green-300 font-semibold flex flex-col items-center gap-1 cursor-pointer"
-              >
-                <PhoneIncoming className="w-4 h-4" />
-                <span>Entrant (SIM 1: inwi)</span>
-              </button>
-
-              <button
-                onClick={() => triggerIncomingCall(1)}
-                className="p-2 bg-yellow-950/40 hover:bg-yellow-900/60 border border-yellow-700/50 rounded text-yellow-300 font-semibold flex flex-col items-center gap-1 cursor-pointer"
-              >
-                <PhoneIncoming className="w-4 h-4" />
-                <span>Entrant (SIM 2: Orange)</span>
-              </button>
-
-              <button
-                onClick={handleToggleSpeaker}
-                className="p-2 bg-blue-950/40 hover:bg-blue-900/60 border border-blue-700/50 rounded text-blue-300 font-semibold flex flex-col items-center gap-1 cursor-pointer"
-              >
-                {speakerOn ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-                <span>Bascule HP ({speakerOn ? 'ON' : 'OFF'})</span>
-              </button>
-
-              <button
-                onClick={handleHangup}
-                className="p-2 bg-red-950/40 hover:bg-red-900/60 border border-red-700/50 rounded text-red-300 font-semibold flex flex-col items-center gap-1 cursor-pointer"
+                onClick={endCall}
+                className="w-12 h-8 rounded-lg bg-[#2B1414] hover:bg-[#401C1C] border border-red-600/70 text-red-400 flex items-center justify-center cursor-pointer shadow-md active:scale-95 transition-all"
+                title="Touche Rouge (Raccrocher / Refuser)"
               >
                 <PhoneOff className="w-4 h-4" />
-                <span>Fin d'appel (CALL_END)</span>
-              </button>
-
-              <button
-                onClick={handleToggleAudioStreaming}
-                className={`p-2 border rounded font-semibold flex flex-col items-center gap-1 cursor-pointer col-span-2 sm:col-span-4 transition ${
-                  isAudioStreaming 
-                    ? 'bg-purple-950/80 border-purple-500 text-purple-200 animate-pulse' 
-                    : 'bg-purple-950/40 hover:bg-purple-900/60 border-purple-700/50 text-purple-300'
-                }`}
-              >
-                <Radio className="w-4 h-4" />
-                <span>{isAudioStreaming ? '🔊 Couper Diffusion Audio (AUDIO_STOP)' : '📻 Écouter Audio Smartphone (AUDIO_START - 200ms Ping-Pong)'}</span>
               </button>
             </div>
 
-            <div className="mt-3 pt-2.5 border-t border-gray-800/80 flex flex-wrap items-center justify-between gap-2 text-xs">
-              <span className="text-gray-400 flex items-center gap-1.5">
-                <History className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Journal d'appels récents : <strong className="text-cyan-400 font-mono">{callRecords.length}</strong></span>
-              </span>
-              <button
-                onClick={() => setCallHistoryModalOpen(true)}
-                className="px-2.5 py-1 bg-cyan-900/40 hover:bg-cyan-800/60 border border-cyan-600/40 hover:border-cyan-500 rounded text-cyan-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <History className="w-3.5 h-3.5" />
-                <span>Afficher le Journal Complet</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Card 4: D3.js Battery Discharge Trend Line Chart */}
-          <BatteryDischargeChart currentLevel={88} />
-
-          {/* Card 5: Live Protocol Log Trace */}
-          <div className="bg-[#161a22] border border-gray-800 rounded-xl p-3 shadow-sm flex flex-col flex-1">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-gray-300 flex items-center gap-1.5">
-                <Cpu className="w-3.5 h-3.5 text-cyan-400" />
-                Trace Protocole Bluetooth BSB & Audio HFP
-              </span>
-              <button 
-                onClick={() => setLogs([])}
-                className="text-[10px] text-gray-400 hover:text-white cursor-pointer"
-              >
-                Effacer logs
-              </button>
-            </div>
-
-            <div className="h-44 bg-black/90 rounded border border-gray-800 p-2 overflow-y-auto font-mono text-[11px] space-y-1">
-              {logs.map((lg, idx) => (
-                <div key={idx} className="flex items-start gap-2">
-                  <span className="text-gray-500 text-[9px] shrink-0">{lg.time}</span>
-                  <span className={`px-1 py-0.2 rounded text-[9px] font-bold shrink-0 ${
-                    lg.dir === 'RX' ? 'bg-purple-900/60 text-purple-300' :
-                    lg.dir === 'TX' ? 'bg-cyan-900/60 text-cyan-300' :
-                    'bg-green-900/60 text-green-300'
-                  }`}>
-                    {lg.dir}
-                  </span>
-                  <span className={`${
-                    lg.dir === 'RX' ? 'text-purple-200' :
-                    lg.dir === 'TX' ? 'text-cyan-200 font-semibold' :
-                    'text-gray-400 italic'
-                  }`}>
-                    {lg.text}
-                  </span>
+            {/* Curve 9300 QWERTY Keyboard Accent Lines */}
+            <div className="w-[310px] grid grid-cols-10 gap-1 pt-1 opacity-40">
+              {['Q','W','E','R','T','Y','U','I','O','P'].map(k => (
+                <div key={k} className="h-4 bg-[#181D26] rounded border border-gray-800 text-[8px] text-gray-500 flex items-center justify-center font-bold">
+                  {k}
                 </div>
               ))}
             </div>
           </div>
+        </div>
 
+        {/* =============================================================== */}
+        {/* RIGHT COLUMN: Interactive Control Station (Tabs & Content)      */}
+        {/* =============================================================== */}
+        <div className="lg:col-span-7 flex flex-col gap-4">
+          
+          {/* Tab Selector Bar */}
+          <div className="bg-[#11161F] border border-[#232F3E] rounded-xl p-1.5 flex items-center gap-1 overflow-x-auto">
+            <button
+              onClick={() => setActiveTab('calls')}
+              className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                activeTab === 'calls'
+                  ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/25'
+                  : 'text-gray-400 hover:text-white hover:bg-[#1A2230]'
+              }`}
+            >
+              <PhoneCall className="w-3.5 h-3.5" />
+              <span>Appels &amp; Vrai Historique</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('media')}
+              className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                activeTab === 'media'
+                  ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/25'
+                  : 'text-gray-400 hover:text-white hover:bg-[#1A2230]'
+              }`}
+            >
+              <Music className="w-3.5 h-3.5" />
+              <span>Contrôle Média</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('contacts')}
+              className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                activeTab === 'contacts'
+                  ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/25'
+                  : 'text-gray-400 hover:text-white hover:bg-[#1A2230]'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>Contacts VIP</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('logs')}
+              className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                activeTab === 'logs'
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/25'
+                  : 'text-gray-400 hover:text-white hover:bg-[#1A2230]'
+              }`}
+            >
+              <Radio className="w-3.5 h-3.5" />
+              <span>Trames BT</span>
+            </button>
+          </div>
+
+          {/* TAB 1: APPELS ET VRAI HISTORIQUE (Restored & Enhanced) */}
+          {activeTab === 'calls' && (
+            <div className="flex flex-col gap-4">
+              
+              {/* Dialer & Outbound Call Box */}
+              <div className="bg-[#11161F] border border-[#232F3E] rounded-2xl p-4 shadow-xl">
+                <div className="flex items-center justify-between pb-3 border-b border-[#1E293B] mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-green-500/10 border border-green-500/30 flex items-center justify-center text-green-400">
+                      <PhoneCall className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs sm:text-sm font-bold text-white">Compositeur &amp; Sélection SIM</h3>
+                      <p className="text-[10px] text-gray-400">Routage audio HFP Bluetooth automatique</p>
+                    </div>
+                  </div>
+
+                  {/* Dual SIM Selector */}
+                  <div className="flex items-center gap-1.5 bg-[#0A0D14] p-1 rounded-lg border border-[#1E293B]">
+                    <button
+                      onClick={() => setSelectedSim('inwi')}
+                      className={`px-2.5 py-1 rounded text-[10px] font-bold transition-colors cursor-pointer ${
+                        selectedSim === 'inwi' ? 'bg-purple-700 text-white' : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      SIM 1 [inwi]
+                    </button>
+                    <button
+                      onClick={() => setSelectedSim('Orange')}
+                      className={`px-2.5 py-1 rounded text-[10px] font-bold transition-colors cursor-pointer ${
+                        selectedSim === 'Orange' ? 'bg-orange-600 text-white' : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      SIM 2 [Orange]
+                    </button>
+                  </div>
+                </div>
+
+                {/* Input & Call Trigger */}
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      placeholder="Saisir un numéro ou sélectionner ci-dessous..."
+                      value={dialerNumber}
+                      onChange={e => setDialerNumber(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') startCall(dialerNumber);
+                      }}
+                      className="w-full bg-[#0A0D14] border border-[#232F3E] focus:border-cyan-500 rounded-xl px-4 py-2.5 text-sm font-mono text-white placeholder-gray-500 focus:outline-none transition-colors"
+                    />
+                    {dialerNumber && (
+                      <button
+                        onClick={() => setDialerNumber('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => startCall(dialerNumber)}
+                    disabled={!dialerNumber.trim()}
+                    className="px-5 py-2.5 bg-green-600 hover:bg-green-500 disabled:opacity-40 disabled:hover:bg-green-600 text-white rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer shadow-lg shadow-green-600/20 transition-all"
+                  >
+                    <Phone className="w-4 h-4" />
+                    <span>Appeler</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* VRAI HISTORIQUE DES APPELS (Émis, Reçus, Manqués) */}
+              <div className="bg-[#11161F] border border-[#232F3E] rounded-2xl p-4 shadow-xl">
+                {/* Header with Search and Clear */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#1E293B]">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center text-yellow-400">
+                      <History className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-xs sm:text-sm font-bold text-white">Vrai Historique des Appels</h3>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono">
+                          {filteredHistory.length} appels
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-gray-400">Journal en direct des appels émis et reçus</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setIsCallHistoryModalOpen(true)}
+                      className="px-2.5 py-1.5 rounded-lg bg-[#1A2230] hover:bg-[#232D40] text-gray-300 hover:text-white text-[11px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer border border-[#2D394C]"
+                      title="Plein écran"
+                    >
+                      <Maximize2 className="w-3 h-3 text-cyan-400" />
+                      <span>Agrandir</span>
+                    </button>
+                    <button
+                      onClick={() => setCallRecords([])}
+                      className="px-2.5 py-1.5 rounded-lg bg-red-950/40 hover:bg-red-900/60 text-red-300 text-[11px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer border border-red-800/40"
+                    >
+                      Effacer
+                    </button>
+                  </div>
+                </div>
+
+                {/* Filter and Search Bar */}
+                <div className="flex flex-col sm:flex-row items-center gap-2 my-3">
+                  {/* Direction Filters */}
+                  <div className="flex items-center gap-1 w-full sm:w-auto bg-[#0A0D14] p-1 rounded-lg border border-[#1E293B]">
+                    <button
+                      onClick={() => setHistoryFilter('all')}
+                      className={`flex-1 sm:flex-initial px-2.5 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer ${
+                        historyFilter === 'all' ? 'bg-[#232D3E] text-white' : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      Tous
+                    </button>
+                    <button
+                      onClick={() => setHistoryFilter('outgoing')}
+                      className={`flex-1 sm:flex-initial px-2.5 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                        historyFilter === 'outgoing' ? 'bg-cyan-900/60 text-cyan-300 border border-cyan-700/50' : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      <ArrowUpRight className="w-3 h-3 text-cyan-400" />
+                      <span>Émis</span>
+                    </button>
+                    <button
+                      onClick={() => setHistoryFilter('incoming')}
+                      className={`flex-1 sm:flex-initial px-2.5 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                        historyFilter === 'incoming' ? 'bg-green-900/60 text-green-300 border border-green-700/50' : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      <ArrowDownLeft className="w-3 h-3 text-green-400" />
+                      <span>Reçus</span>
+                    </button>
+                    <button
+                      onClick={() => setHistoryFilter('missed')}
+                      className={`flex-1 sm:flex-initial px-2.5 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                        historyFilter === 'missed' ? 'bg-red-900/60 text-red-300 border border-red-700/50' : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      <PhoneMissed className="w-3 h-3 text-red-400" />
+                      <span>Manqués</span>
+                    </button>
+                  </div>
+
+                  {/* Search Input */}
+                  <div className="relative flex-1 w-full">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                    <input
+                      type="text"
+                      placeholder="Filtrer l'historique par nom ou numéro..."
+                      value={historySearch}
+                      onChange={e => setHistorySearch(e.target.value)}
+                      className="w-full bg-[#0A0D14] border border-[#1E293B] rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Call History Records List */}
+                <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
+                  {filteredHistory.length === 0 ? (
+                    <div className="text-center py-8 text-xs text-gray-500">
+                      Aucun appel ne correspond à votre filtre.
+                    </div>
+                  ) : (
+                    filteredHistory.map((item) => {
+                      const isOutgoing = item.direction === 'outgoing';
+                      const isMissed = item.status === 'missed';
+
+                      return (
+                        <div
+                          key={item.id}
+                          className="bg-[#0D121B] hover:bg-[#131A26] border border-[#1C2636] hover:border-cyan-500/30 rounded-xl p-3 flex items-center justify-between gap-3 transition-colors"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            {/* Direction Icon Badge */}
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                              isMissed
+                                ? 'bg-red-500/10 border border-red-500/30 text-red-400'
+                                : isOutgoing
+                                ? 'bg-cyan-500/10 border border-cyan-500/30 text-cyan-400'
+                                : 'bg-green-500/10 border border-green-500/30 text-green-400'
+                            }`}>
+                              {isMissed ? (
+                                <PhoneMissed className="w-4 h-4" />
+                              ) : isOutgoing ? (
+                                <ArrowUpRight className="w-4 h-4" />
+                              ) : (
+                                <ArrowDownLeft className="w-4 h-4" />
+                              )}
+                            </div>
+
+                            {/* Contact Details */}
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs sm:text-sm font-bold text-white truncate">
+                                  {item.callerName}
+                                </span>
+                                {item.simName && (
+                                  <span className={`px-1.5 py-0.2 rounded text-[9px] font-mono font-bold ${
+                                    item.simName.toLowerCase().includes('orange') 
+                                      ? 'bg-orange-500/20 text-orange-300' 
+                                      : 'bg-purple-500/20 text-purple-300'
+                                  }`}>
+                                    {item.simName}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 text-[11px] text-gray-400 font-mono mt-0.5">
+                                <span>{item.phoneNumber}</span>
+                                <span>•</span>
+                                <span className="text-gray-500">{item.timestamp}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Duration and Redial Button */}
+                          <div className="flex items-center gap-3 shrink-0">
+                            <div className="text-right">
+                              <span className={`text-xs font-mono font-semibold block ${
+                                isMissed ? 'text-red-400' : 'text-gray-300'
+                              }`}>
+                                {item.duration || '00:00'}
+                              </span>
+                              <span className="text-[9px] text-gray-500">
+                                {isOutgoing ? 'Appel émis' : isMissed ? 'Manqué' : 'Appel reçu'}
+                              </span>
+                            </div>
+
+                            {/* One-click Rappeler Button */}
+                            <button
+                              onClick={() => startCall(item.phoneNumber, item.callerName, item.simName as any)}
+                              className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-black text-xs font-bold rounded-lg flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-cyan-600/20"
+                              title="Rappeler ce correspondant"
+                            >
+                              <Phone className="w-3 h-3" />
+                              <span className="hidden sm:inline">Rappeler</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: CONTRÔLE MÉDIA (Restored & Enhanced) */}
+          {activeTab === 'media' && (
+            <div className="bg-[#11161F] border border-[#232F3E] rounded-2xl p-5 shadow-xl flex flex-col gap-6">
+              
+              {/* Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-[#1E293B]">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400">
+                    <Music className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-bold text-white">Contrôle Média Smartphone</h2>
+                    <p className="text-[11px] text-gray-400">Diffusion audio vers BlackBerry Curve 9300 (WAV 500ms)</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setIsMediaModalOpen(true)}
+                    className="px-3 py-1.5 rounded-lg bg-[#1A2230] hover:bg-[#232D40] text-gray-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer border border-[#2D394C]"
+                  >
+                    <Maximize2 className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Mode Fenêtre</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Player UI */}
+              <div className="flex flex-col sm:flex-row items-center gap-6 bg-[#0B0E14] p-5 rounded-2xl border border-[#1E293B]">
+                {/* Vinyl / Album Art */}
+                <div className="relative shrink-0">
+                  <div className={`w-32 h-32 rounded-full bg-gradient-to-tr from-gray-900 via-[#1C1838] to-purple-900 border-4 border-gray-800 shadow-2xl flex items-center justify-center ${
+                    isPlaying ? 'animate-[spin_6s_linear_infinite]' : ''
+                  }`}>
+                    <div className="w-10 h-10 rounded-full bg-[#0B0E14] border-2 border-purple-400/50 flex items-center justify-center">
+                      <Disc3 className="w-6 h-6 text-purple-400" />
+                    </div>
+                  </div>
+                  <span className={`absolute -bottom-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[9px] font-bold border ${
+                    isPlaying ? 'bg-green-500/20 text-green-300 border-green-500/40' : 'bg-gray-800 text-gray-400 border-gray-700'
+                  }`}>
+                    {isPlaying ? 'En cours' : 'En pause'}
+                  </span>
+                </div>
+
+                {/* Track Details & Controls */}
+                <div className="flex-1 w-full flex flex-col justify-center">
+                  <h3 className="text-lg font-bold text-white">{mediaTitle}</h3>
+                  <p className="text-xs text-cyan-400 font-medium">{mediaArtist}</p>
+                  <p className="text-[10px] text-gray-500 font-mono mt-0.5">
+                    Audio J2ME JSR-135 : 8000 Hz, 16-bit Mono ({chunksSentCount} paquets transmis)
+                  </p>
+
+                  {/* Progress Bar */}
+                  <div className="mt-4">
+                    <div className="w-full bg-gray-800 h-1.5 rounded-full overflow-hidden">
+                      <div 
+                        className="bg-purple-500 h-full rounded-full transition-all duration-300"
+                        style={{ width: `${mediaProgress}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-[10px] font-mono text-gray-500 mt-1">
+                      <span>01:42</span>
+                      <span>03:50</span>
+                    </div>
+                  </div>
+
+                  {/* Playback Buttons */}
+                  <div className="flex items-center justify-center gap-4 mt-3">
+                    <button
+                      onClick={() => {
+                        setMediaTitle('Save Your Tears');
+                        addLog('TX: MEDIA_PREVIOUS', 'tx');
+                      }}
+                      className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white cursor-pointer"
+                    >
+                      <SkipBack className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        const next = !isPlaying;
+                        setIsPlaying(next);
+                        addLog(next ? 'TX: MEDIA_PLAY' : 'TX: MEDIA_PAUSE', 'tx');
+                      }}
+                      className="p-3 rounded-full bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-600/30 cursor-pointer"
+                    >
+                      {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setMediaTitle('Blinding Lights');
+                        addLog('TX: MEDIA_NEXT', 'tx');
+                      }}
+                      className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white cursor-pointer"
+                    >
+                      <SkipForward className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Volume & Audio Route Settings */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-[#0B0E14] p-4 rounded-xl border border-[#1E293B]">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-gray-300 font-medium">Volume Smartphone</span>
+                    <span className="text-xs font-mono text-cyan-400">{isMuted ? '0%' : `${mediaVolume}%`}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setIsMuted(!isMuted)}
+                      className="text-gray-400 hover:text-white cursor-pointer"
+                    >
+                      {isMuted ? <VolumeX className="w-4 h-4 text-red-400" /> : <Volume2 className="w-4 h-4 text-purple-400" />}
+                    </button>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={isMuted ? 0 : mediaVolume}
+                      onChange={e => {
+                        setIsMuted(false);
+                        setMediaVolume(Number(e.target.value));
+                      }}
+                      className="flex-1 accent-purple-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-[#0B0E14] p-4 rounded-xl border border-[#1E293B] flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-300 font-medium">Flux Audio Curve 9300</span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      audioStreamingActive ? 'bg-green-500/20 text-green-300' : 'bg-gray-800 text-gray-500'
+                    }`}>
+                      {audioStreamingActive ? 'SCO Connecté' : 'Désactivé'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const next = !audioStreamingActive;
+                      setAudioStreamingActive(next);
+                      addLog(next ? 'TX: AUDIO_START|8000|1|16|500' : 'TX: AUDIO_STOP', 'tx');
+                    }}
+                    className="w-full mt-2 py-1.5 bg-[#1B2230] hover:bg-[#232C3D] text-xs font-semibold rounded-lg text-gray-200 border border-[#2B3547] cursor-pointer"
+                  >
+                    {audioStreamingActive ? 'Arrêter le flux audio' : 'Activer le flux audio'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: CONTACTS VIP (Restored & Enhanced) */}
+          {activeTab === 'contacts' && (
+            <div className="bg-[#11161F] border border-[#232F3E] rounded-2xl p-5 shadow-xl flex flex-col gap-4">
+              <div className="flex items-center justify-between pb-3 border-b border-[#1E293B]">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                    <Users className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                      Contacts VIP Synchronisés
+                      <span className="text-[10px] px-2 py-0.2 rounded-full bg-cyan-500/20 text-cyan-300 font-mono">
+                        {contacts.length}
+                      </span>
+                    </h2>
+                    <p className="text-[11px] text-gray-400">Carnet d'adresses commun BlackBerry Curve 9300 &amp; Android</p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setIsContactsModalOpen(true)}
+                  className="px-3 py-1.5 rounded-lg bg-[#1A2230] hover:bg-[#232D40] text-gray-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer border border-[#2D394C]"
+                >
+                  <Maximize2 className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Voir Tout</span>
+                </button>
+              </div>
+
+              {/* Contact Cards Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto pr-1">
+                {contacts.map((contact) => (
+                  <div
+                    key={contact.id}
+                    className="bg-[#0B0E14] hover:bg-[#10141D] border border-[#1E293B] hover:border-cyan-500/40 rounded-xl p-3.5 flex flex-col justify-between gap-3 transition-colors"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-full bg-cyan-600/20 border border-cyan-500/30 text-cyan-400 flex items-center justify-center font-bold text-xs">
+                          {contact.name.charAt(0)}
+                        </div>
+                        <div>
+                          <h4 className="text-xs sm:text-sm font-bold text-white">{contact.name}</h4>
+                          <p className="text-[11px] font-mono text-gray-400">{contact.number}</p>
+                          {contact.notes && (
+                            <p className="text-[10px] text-gray-500">{contact.notes}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-2 border-t border-gray-800/80">
+                      <button
+                        onClick={() => startCall(contact.number, contact.name, 'inwi')}
+                        className="flex-1 py-1.5 px-2 bg-purple-900/50 hover:bg-purple-800 text-purple-200 border border-purple-700/50 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                      >
+                        <Phone className="w-3 h-3 text-purple-400" />
+                        <span>Appel inwi</span>
+                      </button>
+                      <button
+                        onClick={() => startCall(contact.number, contact.name, 'Orange')}
+                        className="flex-1 py-1.5 px-2 bg-orange-900/50 hover:bg-orange-800 text-orange-200 border border-orange-700/50 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                      >
+                        <Phone className="w-3 h-3 text-orange-400" />
+                        <span>Appel Orange</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: PROTOCOLE ET LOGS BLUETOOTH */}
+          {activeTab === 'logs' && (
+            <div className="bg-[#11161F] border border-[#232F3E] rounded-2xl p-4 shadow-xl flex flex-col gap-3">
+              <div className="flex items-center justify-between pb-2 border-b border-[#1E293B]">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400">
+                    <Radio className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs sm:text-sm font-bold text-white">Moniteur Protocole Bluetooth RFCOMM</h3>
+                    <p className="text-[10px] text-gray-400">Échanges série bidirectionnels en temps réel</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setBtLogs([])}
+                  className="px-2.5 py-1 text-[10px] font-bold bg-[#1C2330] hover:bg-[#252E3E] text-gray-400 hover:text-white rounded border border-[#2D394C] cursor-pointer"
+                >
+                  Effacer
+                </button>
+              </div>
+
+              {/* Logs terminal box */}
+              <div className="bg-[#07090E] p-3 rounded-xl border border-[#1A2230] font-mono text-[10px] leading-relaxed max-h-[350px] overflow-y-auto space-y-1.5">
+                {btLogs.map(log => (
+                  <div key={log.id} className="flex items-start gap-2">
+                    <span className="text-gray-500 shrink-0">{log.time}</span>
+                    <span className={`shrink-0 font-bold ${
+                      log.type === 'tx' ? 'text-green-400' : log.type === 'rx' ? 'text-cyan-400' : 'text-amber-400'
+                    }`}>
+                      [{log.type.toUpperCase()}]
+                    </span>
+                    <span className="text-gray-300 break-all">{log.text}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Guide HFP Modal */}
-      {hfpGuideModalOpen && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="max-w-md w-full bg-[#161a22] border border-cyan-500/50 rounded-2xl p-5 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-gray-800 pb-2">
-              <div className="flex items-center gap-2 text-cyan-400 font-bold">
-                <Headphones className="w-5 h-5" />
-                <span>Guide Audio Mains-Libres Bluetooth (HFP)</span>
-              </div>
-              <button 
-                onClick={() => setHfpGuideModalOpen(false)}
-                className="text-gray-400 hover:text-white cursor-pointer text-sm"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="text-xs space-y-3 text-gray-300">
-              <div className="bg-[#0d1117] p-3 rounded-lg border border-gray-800 space-y-1.5">
-                <div className="font-bold text-yellow-400">1. Sur le BlackBerry Curve / Bold :</div>
-                <p>
-                  Allez dans <strong>Options &gt; Bluetooth &gt; Touche Menu &gt; Options Bluetooth</strong>.
-                  Vérifiez que le profil <em>Passerelle audio mains libres</em> ou <em>Casque</em> est activé.
-                  L'application SmartBridge v1.4.0 enregistre automatiquement l'enregistrement de service SDP (UUID 0x111E).
-                </p>
-              </div>
-
-              <div className="bg-[#0d1117] p-3 rounded-lg border border-gray-800 space-y-1.5">
-                <div className="font-bold text-yellow-400">2. Sur le smartphone Android :</div>
-                <p>
-                  Dans <strong>Paramètres &gt; Bluetooth &gt; Appareils appairés &gt; BlackBerry Curve</strong>.
-                  Activez l'interrupteur <strong>« Appels audio »</strong> (Handsfree Profile).
-                </p>
-              </div>
-
-              <div className="bg-[#0d1117] p-3 rounded-lg border border-gray-800 space-y-1.5">
-                <div className="font-bold text-yellow-400">3. Lors d'un appel :</div>
-                <p>
-                  Parlez dans le microphone du BlackBerry et écoutez dans son écouteur !
-                  Vous pouvez basculer le son vers le haut-parleur du BlackBerry ou celui du smartphone avec l'option <strong>Route Audio</strong>.
-                </p>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setHfpGuideModalOpen(false)}
-              className="w-full py-2 bg-cyan-700 hover:bg-cyan-600 text-white rounded-lg font-bold text-xs cursor-pointer"
-            >
-              Compris
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Call History Modal */}
-      <CallHistoryModal
-        isOpen={callHistoryModalOpen}
-        onClose={() => setCallHistoryModalOpen(false)}
-        callRecords={callRecords}
-        onSelectNumberToCall={(num, name) => {
-          setDialNumber(num);
-          setCallHistoryModalOpen(false);
-          addLog('UI', `Sélection depuis l'historique : ${name} (${num})`);
-          if (sims.length >= 2) {
-            setSimChoiceModalOpen(true);
-          } else {
-            executeOutboundCall(sims[0]?.slot ?? 0, sims[0]?.name ?? 'inwi');
-          }
-        }}
-        onClearHistory={() => {
-          setCallRecords([]);
-          addLog('UI', 'Historique des appels récents réinitialisé');
+      {/* Standalone Modals (Media Controller, Contacts, and Call History) */}
+      <MediaControllerModal
+        isOpen={isMediaModalOpen}
+        onClose={() => setIsMediaModalOpen(false)}
+        onMediaAction={(action) => {
+          if (action === 'PLAY') setIsPlaying(true);
+          if (action === 'PAUSE') setIsPlaying(false);
+          addLog(`TX: MEDIA_${action}`, 'tx');
         }}
       />
 
-      {/* Compiled Deliverables Footer */}
-      <footer className="w-full max-w-6xl mt-6 p-4 bg-[#161a22] border border-gray-800 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-3">
-          <CheckCircle2 className="w-5 h-5 text-green-400" />
-          <div>
-            <div className="font-bold text-white">Binaires BlackBerry OS 5.0 (v1.4.0) générés avec succès</div>
-            <div className="text-[11px] text-gray-400">
-              Compilé avec BlackBerry RAPC, Preverified CLDC 1.1 pour Curve 9300 &amp; Bold
-            </div>
-          </div>
-        </div>
+      <ContactsModal
+        isOpen={isContactsModalOpen}
+        onClose={() => setIsContactsModalOpen(false)}
+        onCallContact={(number, name) => {
+          setIsContactsModalOpen(false);
+          startCall(number, name);
+        }}
+        onSyncContacts={() => {
+          addLog('TX: GET_CONTACTS', 'tx');
+          addLog('RX: CONTACTS_SYNC|8 contacts reçus', 'rx');
+        }}
+      />
 
-        <div className="flex items-center gap-2">
-          <a
-            href="/blackberry/BBSmartBridge.cod"
-            download="BBSmartBridge.cod"
-            className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded border border-gray-700 font-mono flex items-center gap-1.5 cursor-pointer"
-          >
-            <Download className="w-3.5 h-3.5 text-cyan-400" />
-            BBSmartBridge.cod (84 Ko)
-          </a>
-          <a
-            href="/blackberry/BBSmartBridge.jad"
-            download="BBSmartBridge.jad"
-            className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded border border-gray-700 font-mono flex items-center gap-1.5 cursor-pointer"
-          >
-            <Download className="w-3.5 h-3.5 text-yellow-400" />
-            BBSmartBridge.jad
-          </a>
-          <a
-            href="/blackberry/BBSmartBridge.alx"
-            download="BBSmartBridge.alx"
-            className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded border border-gray-700 font-mono flex items-center gap-1.5 cursor-pointer"
-          >
-            <Download className="w-3.5 h-3.5 text-green-400" />
-            BBSmartBridge.alx
-          </a>
-        </div>
-      </footer>
+      <CallHistoryModal
+        isOpen={isCallHistoryModalOpen}
+        onClose={() => setIsCallHistoryModalOpen(false)}
+        callRecords={callRecords}
+        onSelectNumberToCall={(number, name) => {
+          setIsCallHistoryModalOpen(false);
+          startCall(number, name);
+        }}
+        onClearHistory={() => setCallRecords([])}
+      />
     </div>
   );
 }

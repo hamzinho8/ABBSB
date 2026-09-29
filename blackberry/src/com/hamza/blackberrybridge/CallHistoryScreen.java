@@ -1,5 +1,6 @@
 package com.hamza.blackberrybridge;
 
+import java.util.Vector;
 import net.rim.device.api.ui.*;
 import net.rim.device.api.ui.container.*;
 import net.rim.device.api.ui.decor.*;
@@ -9,36 +10,6 @@ import net.rim.device.api.ui.Keypad;
 public class CallHistoryScreen extends MainScreen {
     private SmartBridgeApp app;
     private VerticalFieldManager listContainer;
-
-    // Call history item data model
-    public static class CallItem {
-        public String name;
-        public String number;
-        public String time;
-        public boolean isIncoming;
-        public String duration;
-        public String simName;
-
-        public CallItem(String name, String number, String time, boolean isIncoming, String duration, String simName) {
-            this.name = name;
-            this.number = number;
-            this.time = time;
-            this.isIncoming = isIncoming;
-            this.duration = duration;
-            this.simName = simName;
-        }
-    }
-
-    private static final CallItem[] SEEDED_CALLS = new CallItem[] {
-        new CallItem("Amina Mansouri", "+212634934134", "14:28", true, "04:12", "inwi"),
-        new CallItem("Youssef Bennani", "+212655881230", "12:15", false, "01:45", "Orange"),
-        new CallItem("Hamza H.", "+212611223344", "10:04", true, "08:30", "inwi"),
-        new CallItem("Service Client inwi", "220", "Hier 18:40", false, "02:10", "inwi"),
-        new CallItem("Dr. Karim Lahlou", "+212672409918", "Hier 15:22", true, "00:54", "Orange"),
-        new CallItem("Fatima Zahra", "+212698712345", "24 Sep", true, "05:20", "inwi"),
-        new CallItem("Orange Recharges", "121", "24 Sep", false, "03:05", "Orange"),
-        new CallItem("Sara Alami", "+212644332211", "23 Sep", true, "02:18", "inwi")
-    };
 
     public CallHistoryScreen(SmartBridgeApp application) {
         super(MainScreen.VERTICAL_SCROLL | MainScreen.VERTICAL_SCROLLBAR);
@@ -68,12 +39,25 @@ public class CallHistoryScreen extends MainScreen {
         listContainer = new VerticalFieldManager();
         listContainer.setPadding(2, 4, 4, 4);
 
-        for (int i = 0; i < SEEDED_CALLS.length; i++) {
-            final CallItem item = SEEDED_CALLS[i];
-            listContainer.add(createCallRow(item));
+        refreshList();
+        add(listContainer);
+    }
+
+    public void refreshList() {
+        listContainer.deleteAll();
+        Vector history = app.getCallManager().getCallHistory();
+
+        if (history.size() == 0) {
+            DarkLabelField empty = new DarkLabelField("Aucun appel enregistré", Field.FIELD_HCENTER, 0x64748B);
+            try { empty.setFont(Font.getDefault().derive(Font.ITALIC, 11)); } catch (Throwable e) {}
+            listContainer.add(empty);
+            return;
         }
 
-        add(listContainer);
+        for (int i = 0; i < history.size(); i++) {
+            final CallItem item = (CallItem) history.elementAt(i);
+            listContainer.add(createCallRow(item));
+        }
     }
 
     private Field createCallRow(final CallItem item) {
@@ -85,8 +69,10 @@ public class CallHistoryScreen extends MainScreen {
     }
 
     private void promptCall(final CallItem item) {
-        app.getCallManager().initiateOutboundCall(item.number, item.name);
-        close();
+        if (item.number != null && item.number.length() > 0) {
+            app.getCallManager().initiateOutboundCall(item.number, item.name);
+            close();
+        }
     }
 
     public boolean keyDown(int keycode, int time) {
@@ -96,6 +82,24 @@ public class CallHistoryScreen extends MainScreen {
             return true;
         }
         return super.keyDown(keycode, time);
+    }
+
+    protected void makeMenu(Menu menu, int instance) {
+        super.makeMenu(menu, instance);
+        menu.add(new MenuItem("Vider l'historique", 100, 1) {
+            public void run() {
+                if (Dialog.ask(Dialog.D_YES_NO, "Effacer tout l'historique ?") == Dialog.YES) {
+                    app.getCallManager().clearCallHistory();
+                    refreshList();
+                }
+            }
+        });
+        menu.add(new MenuItem("Composer un numéro", 100, 2) {
+            public void run() {
+                close();
+                app.getUIManager().openDialer();
+            }
+        });
     }
 
     // Custom focusable Call Row for Curve 9300
@@ -121,20 +125,21 @@ public class CallHistoryScreen extends MainScreen {
             int w = getWidth();
             int h = getHeight();
 
-            // Background & Border
             graphics.setColor(focused ? 0x083344 : 0x11161B);
             graphics.fillRoundRect(0, 0, w, h, 6, 6);
-
             graphics.setColor(focused ? 0x00E5FF : 0x1F2937);
             graphics.drawRoundRect(0, 0, w, h, 6, 6);
 
-            // Direction badge: [IN] in green, [OUT] in cyan
-            if (item.isIncoming) {
+            // Direction badge: [IN] in green, [OUT] in cyan, [MISSED] in red
+            if (item.isIncoming()) {
                 graphics.setColor(0x22C55E);
                 graphics.drawText("[IN]", 6, 4);
-            } else {
+            } else if (item.isOutgoing()) {
                 graphics.setColor(0x00E5FF);
                 graphics.drawText("[OUT]", 6, 4);
+            } else {
+                graphics.setColor(0xEF4444);
+                graphics.drawText("[MISSED]", 6, 4);
             }
 
             // Name in bold white
@@ -142,7 +147,7 @@ public class CallHistoryScreen extends MainScreen {
             try {
                 graphics.setFont(Font.getDefault().derive(Font.BOLD, 12));
             } catch (Throwable e) {}
-            graphics.drawText(item.name, 42, 4);
+            graphics.drawText(item.name, 48, 4);
 
             // SIM badge
             graphics.setColor(0xFACC15);
@@ -157,7 +162,10 @@ public class CallHistoryScreen extends MainScreen {
 
             // Subline: Number + Duration
             graphics.setColor(0x64748B);
-            graphics.drawText(item.number + " • " + item.duration, 42, 18);
+            try {
+                graphics.setFont(Font.getDefault().derive(Font.PLAIN, 10));
+            } catch (Throwable e) {}
+            graphics.drawText(item.number + " • " + item.duration, 48, 18);
         }
 
         protected boolean navigationClick(int status, int time) {
