@@ -1,7 +1,7 @@
 <loader version="1.0">
     <application id="BBSmartBridge">
         <name>SmartBridge</name>
-        <description>Android Bluetooth Companion for BlackBerry Curve 9300 with HFP Audio Routing</description>
+        <description>Android Bluetooth Companion for BlackBerry Curve 9300 with Audio Streamer</description>
         <version>1.4.0</version>
         <vendor>Hamza</vendor>
         <copyright>Copyright (c) 2024 Hamza</copyright>
