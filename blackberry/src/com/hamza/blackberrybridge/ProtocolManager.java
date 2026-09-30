@@ -1,6 +1,7 @@
 package com.hamza.blackberrybridge;
 
 import java.util.Vector;
+import com.hamza.blackberrybridge.audio.AudioStreamReceiver;
 import com.hamza.blackberrybridge.audio.BlackBerryAudioStreamer;
 import com.hamza.blackberrybridge.audio.BluetoothAudioReceiver;
 
@@ -23,11 +24,11 @@ public class ProtocolManager {
         // 1. Traitement ultra-rapide des flux audio WAV autonomes (500ms ou 200ms)
         // Moteur séquentiel unique sur thread dédié à haute priorité (Thread.MAX_PRIORITY)
         if (message.startsWith("AUDIO_CHUNK|")) {
-            BlackBerryAudioStreamer.getInstance().enqueueChunk(message.substring(12));
+            AudioStreamReceiver.getInstance().onAudioChunk(message.substring(12));
             return;
         }
         if (message.startsWith("VOICE_TX|")) {
-            BlackBerryAudioStreamer.getInstance().enqueueChunk(message.substring(9));
+            AudioStreamReceiver.getInstance().onAudioChunk(message.substring(9));
             return;
         }
         if (message.startsWith("AUDIO_START") || message.startsWith("VOICE_START")) {
@@ -122,21 +123,21 @@ public class ProtocolManager {
                 if (parts.length >= 4) app.getCallManager().handleCallMissed(parts[1], parts[2], parts[3]);
             }
             else if (command.equals("AUDIO_START") || command.equals("VOICE_START")) {
-                BlackBerryAudioStreamer.getInstance().startAudio();
+                AudioStreamReceiver.getInstance().onAudioStart();
             }
             else if (command.equals("AUDIO_CHUNK") || command.equals("VOICE_TX")) {
                 if (parts.length > 1) {
-                    BlackBerryAudioStreamer.getInstance().enqueueChunk(parts[1]);
+                    AudioStreamReceiver.getInstance().onAudioChunk(parts[1]);
                 }
             }
             else if (command.equals("AUDIO_STOP") || command.equals("VOICE_STOP")) {
-                BlackBerryAudioStreamer.getInstance().stopAudio();
+                AudioStreamReceiver.getInstance().onAudioStop();
             }
             else if (command.equals("AUDIO_PLAYBACK_START")) {
-                BlackBerryAudioStreamer.getInstance().startAudio();
+                AudioStreamReceiver.getInstance().start();
             }
             else if (command.equals("AUDIO_PLAYBACK_STOP")) {
-                BlackBerryAudioStreamer.getInstance().stopAudio();
+                AudioStreamReceiver.getInstance().stop();
             }
             else if (command.equals("SPEAKER_STATUS")) {
                 String status = (parts.length >= 2) ? parts[1] : "OFF";
