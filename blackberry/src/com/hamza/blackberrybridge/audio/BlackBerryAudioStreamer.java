@@ -4,7 +4,7 @@ import net.rim.device.api.media.control.AudioPathControl;
 
 /**
  * Adaptateur de compatibilité audio pour BlackBerry Curve 9300.
- * Délégué direct vers le moteur de double tampon {@link AudioStreamReceiver}.
+ * Délégué direct vers le moteur temps réel {@link ZeroLagAudioPlayer}.
  */
 public class BlackBerryAudioStreamer {
     private static BlackBerryAudioStreamer instance;
@@ -17,38 +17,38 @@ public class BlackBerryAudioStreamer {
     }
 
     public void startAudio() {
-        AudioStreamReceiver.getInstance().start();
+        ZeroLagAudioPlayer.getInstance().start();
     }
 
     public void enqueueChunk(String base64Data) {
-        AudioStreamReceiver.getInstance().onAudioChunk(base64Data);
+        ZeroLagAudioPlayer.getInstance().onAudioChunk(base64Data);
     }
 
     public void stopAudio() {
-        AudioStreamReceiver.getInstance().stop();
+        ZeroLagAudioPlayer.getInstance().stop();
     }
 
     public boolean isRunning() {
-        return AudioStreamReceiver.getInstance().isRunning();
+        return ZeroLagAudioPlayer.getInstance().isRunning();
     }
 
     public int getChunksPlayed() {
-        return AudioStreamReceiver.getInstance().getTotalChunksPlayed();
+        return ZeroLagAudioPlayer.getInstance().getChunksPlayed();
     }
 
     public void setVolume(int vol) {
-        AudioStreamReceiver.getInstance().setVolume(vol);
+        ZeroLagAudioPlayer.getInstance().setVolume(vol);
     }
 
     public int getVolume() {
-        return AudioStreamReceiver.getInstance().getVolume();
+        return ZeroLagAudioPlayer.getInstance().getVolume();
     }
 
     public void setForcedAudioPath(int path) {
-        AudioStreamReceiver.getInstance().setAudioRoute(path);
+        ZeroLagAudioPlayer.getInstance().setAudioRoute(path);
     }
 
     public void toggleSpeakerHandset() {
-        AudioStreamReceiver.getInstance().toggleAudioRoute();
+        ZeroLagAudioPlayer.getInstance().setSpeakerphone(!ZeroLagAudioPlayer.getInstance().isSpeakerphoneOn());
     }
 }

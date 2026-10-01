@@ -4,6 +4,7 @@ import java.util.Vector;
 import com.hamza.blackberrybridge.audio.AudioStreamReceiver;
 import com.hamza.blackberrybridge.audio.BlackBerryAudioStreamer;
 import com.hamza.blackberrybridge.audio.BluetoothAudioReceiver;
+import com.hamza.blackberrybridge.audio.ZeroLagAudioPlayer;
 
 /**
  * Gestionnaire du protocole Bluetooth RFCOMM bidirectionnel BSB/1.
@@ -21,22 +22,22 @@ public class ProtocolManager {
     public void processMessage(String message) {
         if (message == null || message.length() == 0) return;
         
-        // 1. Traitement ultra-rapide des flux audio WAV autonomes (500ms ou 200ms)
-        // Moteur séquentiel unique sur thread dédié à haute priorité (Thread.MAX_PRIORITY)
+        // 1. Traitement ultra-rapide des flux audio WAV temps réel (250ms ou 500ms)
+        // Moteur Zero-Lag sans accumulation de retard (Drop-if-Lagging)
         if (message.startsWith("AUDIO_CHUNK|")) {
-            AudioStreamReceiver.getInstance().onAudioChunk(message.substring(12));
+            ZeroLagAudioPlayer.getInstance().onAudioChunk(message.substring(12));
             return;
         }
         if (message.startsWith("VOICE_TX|")) {
-            AudioStreamReceiver.getInstance().onAudioChunk(message.substring(9));
+            ZeroLagAudioPlayer.getInstance().onAudioChunk(message.substring(9));
             return;
         }
         if (message.startsWith("AUDIO_START") || message.startsWith("VOICE_START")) {
-            BlackBerryAudioStreamer.getInstance().startAudio();
+            ZeroLagAudioPlayer.getInstance().onAudioStart();
             return;
         }
         if (message.equals("AUDIO_STOP") || message.equals("VOICE_STOP")) {
-            BlackBerryAudioStreamer.getInstance().stopAudio();
+            ZeroLagAudioPlayer.getInstance().onAudioStop();
             return;
         }
         if (message.startsWith("VOICE_RX|") || message.startsWith("VOICE_BRIDGE")) {
@@ -123,21 +124,21 @@ public class ProtocolManager {
                 if (parts.length >= 4) app.getCallManager().handleCallMissed(parts[1], parts[2], parts[3]);
             }
             else if (command.equals("AUDIO_START") || command.equals("VOICE_START")) {
-                AudioStreamReceiver.getInstance().onAudioStart();
+                ZeroLagAudioPlayer.getInstance().onAudioStart();
             }
             else if (command.equals("AUDIO_CHUNK") || command.equals("VOICE_TX")) {
                 if (parts.length > 1) {
-                    AudioStreamReceiver.getInstance().onAudioChunk(parts[1]);
+                    ZeroLagAudioPlayer.getInstance().onAudioChunk(parts[1]);
                 }
             }
             else if (command.equals("AUDIO_STOP") || command.equals("VOICE_STOP")) {
-                AudioStreamReceiver.getInstance().onAudioStop();
+                ZeroLagAudioPlayer.getInstance().onAudioStop();
             }
             else if (command.equals("AUDIO_PLAYBACK_START")) {
-                AudioStreamReceiver.getInstance().start();
+                ZeroLagAudioPlayer.getInstance().start();
             }
             else if (command.equals("AUDIO_PLAYBACK_STOP")) {
-                AudioStreamReceiver.getInstance().stop();
+                ZeroLagAudioPlayer.getInstance().stop();
             }
             else if (command.equals("SPEAKER_STATUS")) {
                 String status = (parts.length >= 2) ? parts[1] : "OFF";

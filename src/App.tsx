@@ -187,11 +187,11 @@ export default function App() {
     { id: 3, time: '14:28:12', text: 'RX: CALL_ACTIVE|101|inwi', type: 'rx' },
     { id: 4, time: '14:32:22', text: 'RX: CALL_END|101', type: 'rx' },
     { id: 5, time: '14:32:23', text: 'SYS: Appel enregistré dans l\'historique (04:12)', type: 'sys' },
-    { id: 6, time: '14:35:00', text: 'TX: AUDIO_START|8000|1|16|500', type: 'tx' },
-    { id: 7, time: '14:35:01', text: 'TX: AUDIO_CHUNK|UklGRi4AAABXQVZFZ... [8044 bytes WAV]', type: 'tx' }
+    { id: 6, time: '14:35:00', text: 'TX: AUDIO_START', type: 'tx' },
+    { id: 7, time: '14:35:01', text: 'TX: AUDIO_CHUNK|UklGRs... [4044 bytes WAV - 250ms Zero-Lag]', type: 'tx' }
   ]);
 
-  // Audio Chunk Simulator Timer
+  // Audio Chunk Simulator Timer (250 ms strict real-time chunks)
   useEffect(() => {
     if (!audioStreamingActive && !isPlaying) return;
     const interval = setInterval(() => {
@@ -199,7 +199,7 @@ export default function App() {
       if (isPlaying) {
         setMediaProgress(prev => (prev >= 100 ? 0 : prev + 1));
       }
-    }, 500); // 500ms audio chunks
+    }, 250); // 250ms audio chunks (4 packets per second)
     return () => clearInterval(interval);
   }, [audioStreamingActive, isPlaying]);
 
@@ -630,7 +630,7 @@ export default function App() {
                         onClick={() => {
                           const next = !audioStreamingActive;
                           setAudioStreamingActive(next);
-                          addLog(next ? 'TX: AUDIO_START|8000|1|16|500' : 'TX: AUDIO_STOP', 'tx');
+                          addLog(next ? 'TX: AUDIO_START' : 'TX: AUDIO_STOP', 'tx');
                         }}
                         className={`p-1.5 rounded-lg border text-center transition-colors cursor-pointer ${
                           audioStreamingActive 
@@ -640,7 +640,7 @@ export default function App() {
                       >
                         <Volume2 className="w-3.5 h-3.5 mx-auto mb-0.5 text-amber-400" />
                         <span className="text-[9px] font-bold block leading-tight">Audio SCO</span>
-                        <span className="text-[7px] font-mono block">{audioStreamingActive ? '500ms WAV' : 'Inactif'}</span>
+                        <span className="text-[7px] font-mono block">{audioStreamingActive ? '250ms ZeroLag' : 'Inactif'}</span>
                       </button>
                     </div>
 
@@ -1041,7 +1041,7 @@ export default function App() {
                   </div>
                   <div>
                     <h2 className="text-sm font-bold text-white">Contrôle Média Smartphone</h2>
-                    <p className="text-[11px] text-gray-400">Diffusion audio vers BlackBerry Curve 9300 (WAV 500ms)</p>
+                    <p className="text-[11px] text-gray-400">Diffusion audio temps réel vers BlackBerry Curve 9300 (WAV 250ms Zero-Lag)</p>
                   </div>
                 </div>
 
@@ -1079,7 +1079,7 @@ export default function App() {
                   <h3 className="text-lg font-bold text-white">{mediaTitle}</h3>
                   <p className="text-xs text-cyan-400 font-medium">{mediaArtist}</p>
                   <p className="text-[10px] text-gray-500 font-mono mt-0.5">
-                    Audio J2ME JSR-135 : 8000 Hz, 16-bit Mono ({chunksSentCount} paquets transmis)
+                    Audio J2ME JSR-135 : 8000 Hz, 16-bit Mono (Blocs 250 ms, Zero-Lag Drop-if-Lagging, {chunksSentCount} paquets)
                   </p>
 
                   {/* Progress Bar */}
