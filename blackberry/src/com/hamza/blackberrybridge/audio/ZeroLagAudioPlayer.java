@@ -8,27 +8,23 @@ import javax.microedition.media.control.VolumeControl;
 import net.rim.device.api.media.control.AudioPathControl;
 
 /**
- * Lecteur audio temps réel anti-latence (Zero-Lag) pour BlackBerry Curve 9300 (OS 5.0 à 7.1).
+ * Lecteur audio temps réel haute fidélité (Zero-Lag HD) pour BlackBerry Curve 9300 (OS 5.0 à 7.1).
  *
- * Spécifications du flux :
- * - Paquet d'amorce : "AUDIO_START\n"
- * - Paquets continus : "AUDIO_CHUNK|<base64_wav>\n" envoyés toutes les 250 ms
- * - Paquet de fin : "AUDIO_STOP\n"
- * - Format : WAV RIFF/PCM 8000 Hz, 16-bit Mono (4044 octets décodés = 250 ms)
- *
- * Architecture Anti-Latence (Drop-if-Lagging) :
- * - Utilisation d'un tampon atomique unique (Single-slot Buffer) au lieu d'une file FIFO.
- * - Si un nouveau paquet AUDIO_CHUNK arrive alors qu'un paquet précédent est en cours
- *   ou en attente, l'ancien est IMMÉDIATEMENT écrasé/rejeté.
- * - Élimine définitivement le retard cumulé de 10 secondes et maintient un flux 100% temps réel.
- * - Fermeture immédiate du Player précédent avant instanciation du nouveau pour libérer le DSP.
+ * AMÉLIORATIONS MAJEURES DE LA QUALITÉ SONORE :
+ * 1. Support Haute Définition (HD) : Détection automatique de la fréquence (8000 Hz, 16000 Hz HD Voice, 22050 Hz).
+ * 2. Élimination des micro-coupures et bruits de saccade (Handoff Ping-Pong) :
+ *    Pré-initialisation du prochain bloc pour enchaîner sans interruption du DAC audio.
+ * 3. Filtre Anti-Saturation acoustique :
+ *    Atténuation de dynamique (-1.5 dB) sur les échantillons PCM 16-bit pour empêcher
+ *    la saturation du petit haut-parleur physique du Curve 9300.
+ * 4. Anti-Latence Stricte (Drop-if-Lagging) :
+ *    Maintien du direct absolu sans accumulation de mémoire tampon.
  */
 public class ZeroLagAudioPlayer implements Runnable, PlayerListener {
 
     private static ZeroLagAudioPlayer instance;
 
     // Tampon atomique à emplacement unique (Single-slot buffer)
-    // Empêche strictement toute accumulation de paquets
     private volatile byte[] pendingChunk = null;
     private final Object bufferLock = new Object();
 
@@ -36,14 +32,15 @@ public class ZeroLagAudioPlayer implements Runnable, PlayerListener {
     private volatile boolean isRunning = false;
     private Thread workerThread;
 
-    // Player multimédia actif
+    // Player multimédia JSR-135 actif
     private Player activePlayer;
     private final Object playerLock = new Object();
     private volatile boolean chunkFinished = false;
 
     // Configuration et routage matériel
-    private int volume = 100; // Volume maximal par défaut
+    private int volume = 100; // 0 à 100
     private int audioRoute = AudioPathControl.AUDIO_PATH_HANDSFREE; // Haut-parleur par défaut
+    private int detectedSampleRate = 16000; // 16 kHz par défaut pour une clarté optimale
 
     // Statistiques de performance
     private int chunksReceived = 0;
@@ -70,23 +67,20 @@ public class ZeroLagAudioPlayer implements Runnable, PlayerListener {
     // =========================================================================
 
     /**
-     * 1. Paquet d'amorce : "AUDIO_START\n"
-     * Démarre le thread de lecture temps réel et réinitialise les compteurs.
+     * Paquet d'amorce : "AUDIO_START" ou "AUDIO_START|<sampleRate>|..."
      */
     public synchronized void onAudioStart() {
         start();
     }
 
     /**
-     * 2. Paquets de flux continu : "AUDIO_CHUNK|<base64_wav>\n" (toutes les 250 ms)
-     * Décode la chaîne Base64 et applique la politique stricte Drop-if-Lagging.
+     * Paquets de flux continu : "AUDIO_CHUNK|<base64_wav>\n"
      */
     public void onAudioChunk(String base64Wav) {
         if (base64Wav == null || base64Wav.length() == 0) {
             return;
         }
 
-        // Auto-démarrage si AUDIO_START n'a pas été envoyé avant
         if (!isRunning) {
             start();
         }
@@ -95,15 +89,21 @@ public class ZeroLagAudioPlayer implements Runnable, PlayerListener {
             // Décodage Base64 pur Java rapide sans dépendance externe
             byte[] wavBytes = FastBase64.decode(base64Wav);
             if (wavBytes != null && wavBytes.length >= 44) {
+
+                // 1. Analyse du format WAV pour optimiser le rendu (Fréquence d'échantillonnage)
+                detectFormat(wavBytes);
+
+                // 2. Traitement acoustique anti-saturation pour haut-parleur Curve 9300
+                applyAcousticMastering(wavBytes);
+
+                // 3. Politique Anti-Latence (Drop-if-Lagging)
                 synchronized (bufferLock) {
                     chunksReceived++;
-                    // ANTI-LATENCE : Si un bloc était déjà en attente, il est jeté immédiatement !
                     if (pendingChunk != null) {
-                        chunksDropped++;
+                        chunksDropped++; // Ancien bloc non lu écrasé immédiatement
                     }
-                    // On ne conserve QUE le bloc le plus récent
                     pendingChunk = wavBytes;
-                    bufferLock.notify(); // Réveil immédiat du thread ouvrier
+                    bufferLock.notify(); // Réveil immédiat du thread de lecture
                 }
             }
         } catch (Throwable t) {
@@ -112,24 +112,61 @@ public class ZeroLagAudioPlayer implements Runnable, PlayerListener {
     }
 
     /**
-     * 3. Paquet de fin : "AUDIO_STOP\n"
-     * Libère toutes les ressources matérielles et coupe la lecture instantanément.
+     * Paquet de fin : "AUDIO_STOP\n"
      */
     public synchronized void onAudioStop() {
         stop();
     }
 
     // =========================================================================
-    // Démarrage / Arrêt du Moteur
+    // Analyse et Traitement Acoustique Haute Qualité
     // =========================================================================
 
     /**
-     * Initialise et démarre le thread haute priorité.
+     * Détecte automatiquement la fréquence d'échantillonnage dans l'en-tête WAV (octets 24-27).
      */
-    public synchronized void start() {
-        if (isRunning) {
-            return;
+    private void detectFormat(byte[] wavBytes) {
+        if (wavBytes.length >= 28) {
+            int rate = (wavBytes[24] & 0xFF) |
+                      ((wavBytes[25] & 0xFF) << 8) |
+                      ((wavBytes[26] & 0xFF) << 16) |
+                      ((wavBytes[27] & 0xFF) << 24);
+            if (rate > 0 && rate != detectedSampleRate) {
+                detectedSampleRate = rate;
+                System.out.println("[ZeroLagAudio] Fréquence détectée: " + detectedSampleRate + " Hz");
+            }
         }
+    }
+
+    /**
+     * Traitement acoustique préventif :
+     * Le haut-parleur interne du Curve 9300 sature et grésille fortement si l'audio numérique
+     * dépasse 0 dBFS. On applique un headroom doux (-1.5 dB, 85%) pour garder un son rond,
+     * net et chaleureux sans aucune distorsion harmonique.
+     */
+    private void applyAcousticMastering(byte[] wavBytes) {
+        if (wavBytes == null || wavBytes.length < 48) return;
+
+        // Les données PCM 16-bit débutent à l'octet 44
+        for (int i = 44; i + 1 < wavBytes.length; i += 2) {
+            int low = wavBytes[i] & 0xFF;
+            int high = wavBytes[i + 1];
+            int sample = (short)((high << 8) | low);
+
+            // Atténuation douce à 85% de la crête pour éviter l'écrêtage analogique
+            sample = (sample * 85) / 100;
+
+            wavBytes[i] = (byte)(sample & 0xFF);
+            wavBytes[i + 1] = (byte)((sample >> 8) & 0xFF);
+        }
+    }
+
+    // =========================================================================
+    // Démarrage / Arrêt du Moteur
+    // =========================================================================
+
+    public synchronized void start() {
+        if (isRunning) return;
 
         isRunning = true;
         chunksReceived = 0;
@@ -140,16 +177,12 @@ public class ZeroLagAudioPlayer implements Runnable, PlayerListener {
             pendingChunk = null;
         }
 
-        workerThread = new Thread(this, "ZeroLagAudio-Worker");
-        // Priorité maximale pour garantir l'exécution temps réel sans saccades J2ME
+        workerThread = new Thread(this, "ZeroLagAudio-HD-Worker");
         workerThread.setPriority(Thread.MAX_PRIORITY);
         workerThread.start();
-        System.out.println("[ZeroLagAudio] Démarrage flux temps réel 250ms.");
+        System.out.println("[ZeroLagAudio] Moteur HD démarré. Priorité Maximale.");
     }
 
-    /**
-     * Arrête le lecteur et libère la mémoire ainsi que le processeur audio.
-     */
     public synchronized void stop() {
         isRunning = false;
 
@@ -158,11 +191,9 @@ public class ZeroLagAudioPlayer implements Runnable, PlayerListener {
             bufferLock.notifyAll();
         }
 
-        // Fermeture immédiate du Player J2ME actif
         closeActivePlayer();
-
         workerThread = null;
-        System.out.println("[ZeroLagAudio] Arrêt. Reçus=" + chunksReceived + ", Joués=" + chunksPlayed + ", Jetés=" + chunksDropped);
+        System.out.println("[ZeroLagAudio] Moteur arrêté. Joués: " + chunksPlayed + " | Jetés: " + chunksDropped);
     }
 
     public boolean isRunning() {
@@ -170,14 +201,13 @@ public class ZeroLagAudioPlayer implements Runnable, PlayerListener {
     }
 
     // =========================================================================
-    // Boucle de Lecture Haute Performance (Worker Thread)
+    // Boucle de Lecture Continue Sans Latence (Worker Thread)
     // =========================================================================
 
     public void run() {
         while (isRunning) {
             byte[] chunkToPlay = null;
 
-            // Récupération atomique du bloc le plus récent
             synchronized (bufferLock) {
                 while (pendingChunk == null && isRunning) {
                     try {
@@ -187,13 +217,10 @@ public class ZeroLagAudioPlayer implements Runnable, PlayerListener {
                     }
                 }
 
-                if (!isRunning) {
-                    break;
-                }
+                if (!isRunning) break;
 
-                // Prélèvement du bloc frais
                 chunkToPlay = pendingChunk;
-                pendingChunk = null; // Emplacement libéré
+                pendingChunk = null;
             }
 
             if (chunkToPlay != null && chunkToPlay.length >= 44) {
@@ -205,18 +232,14 @@ public class ZeroLagAudioPlayer implements Runnable, PlayerListener {
     }
 
     /**
-     * Lecture d'un bloc de 250 ms avec routage audio, volume 100% et commutation sans latence.
+     * Joue un bloc audio avec configuration matérielle et enchaînement optimisé.
      */
     private void playSingleChunk(byte[] wavBytes) {
         Player player = null;
         ByteArrayInputStream bais = null;
 
         try {
-            // 1. Fermer scrupuleusement l'ancien Player avant d'en ouvrir un nouveau
-            // Cela libère la mémoire native et le codec matériel du Curve 9300
-            closeActivePlayer();
-
-            // 2. Création du nouveau Player via javax.microedition.media.Manager
+            // Création du Player J2ME
             bais = new ByteArrayInputStream(wavBytes);
             try {
                 player = Manager.createPlayer(bais, "audio/x-wav");
@@ -230,49 +253,54 @@ public class ZeroLagAudioPlayer implements Runnable, PlayerListener {
                 }
             }
 
-            if (player == null) {
-                return;
-            }
+            if (player == null) return;
+
+            // Préparation du nouveau player avant d'éteindre l'ancien (réduit le délai inter-blocs)
+            player.realize();
+            player.prefetch();
+            applyAudioRouting(player);
+            applyVolumeControl(player);
+
+            player.addPlayerListener(this);
+
+            // Handoff sans interruption : on ferme le précédent juste avant le start
+            closeActivePlayer();
 
             synchronized (playerLock) {
                 activePlayer = player;
                 chunkFinished = false;
             }
 
-            player.addPlayerListener(this);
-
-            // 3. Initialisation matérielle immédiate
-            player.realize();
-            player.prefetch();
-
-            // 4. Configuration du routage audio (Haut-parleur externe ou casque)
-            applyAudioRouting(player);
-
-            // 5. Configuration du VolumeControl à 100% (Volume maximum)
-            applyVolumeControl(player);
-
-            // 6. Démarrage de la lecture
             player.start();
 
-            // 7. Surveillance active de la durée de lecture (250 ms nominal)
-            // Si un nouveau paquet arrive et qu'on approche de 250 ms, on passe directement au suivant !
+            // Calcul de la durée théorique du bloc (ex: 250 ms)
+            // PCM 16-bit Mono = (bytes - 44) / (sampleRate * 2) en secondes
+            int pcmBytes = wavBytes.length - 44;
+            int bytesPerSecond = (detectedSampleRate > 0 ? detectedSampleRate : 16000) * 2;
+            int nominalDurationMs = (pcmBytes > 0 && bytesPerSecond > 0) ? (pcmBytes * 1000 / bytesPerSecond) : 250;
+            if (nominalDurationMs <= 0 || nominalDurationMs > 1000) {
+                nominalDurationMs = 250;
+            }
+
+            // Surveillance temporelle active avec passage direct au bloc suivant si un bloc frais attend
             long startTime = System.currentTimeMillis();
+            int maxDuration = nominalDurationMs + 10;
+            int switchThreshold = Math.max(50, nominalDurationMs - 30);
+
             while (isRunning && !chunkFinished) {
                 long elapsed = System.currentTimeMillis() - startTime;
 
-                // Si le bloc est fini ou a dépassé 260 ms, on sort
-                if (elapsed >= 260 || player.getState() != Player.STARTED) {
+                if (elapsed >= maxDuration || player.getState() != Player.STARTED) {
                     break;
                 }
 
-                // Si un NOUVEAU paquet est arrivé dans le tampon et qu'on a déjà joué au moins 210 ms,
-                // on coupe pour éviter tout décalage temporel
-                if (pendingChunk != null && elapsed >= 210) {
+                // Si un NOUVEAU paquet attend et qu'on approche de la fin, on enchaîne immédiatement
+                if (pendingChunk != null && elapsed >= switchThreshold) {
                     break;
                 }
 
                 try {
-                    Thread.sleep(12);
+                    Thread.sleep(10);
                 } catch (InterruptedException ie) {
                     break;
                 }
@@ -283,16 +311,14 @@ public class ZeroLagAudioPlayer implements Runnable, PlayerListener {
         } catch (Throwable t) {
             System.out.println("[ZeroLagAudio] Erreur lecture: " + t.getMessage());
         } finally {
-            // Nettoyage immédiat des flux mémoire
             if (bais != null) {
                 try { bais.close(); } catch (Throwable ignored) {}
             }
-            closeActivePlayer();
         }
     }
 
     /**
-     * Fermeture propre du Player J2ME.
+     * Fermeture propre du Player actif.
      */
     private void closeActivePlayer() {
         synchronized (playerLock) {
@@ -322,7 +348,7 @@ public class ZeroLagAudioPlayer implements Runnable, PlayerListener {
                 vc = (VolumeControl) player.getControl("javax.microedition.media.control.VolumeControl");
             }
             if (vc != null) {
-                vc.setLevel(volume); // 100%
+                vc.setLevel(volume);
             }
         } catch (Throwable ignored) {}
     }
@@ -339,7 +365,6 @@ public class ZeroLagAudioPlayer implements Runnable, PlayerListener {
             }
 
             if (apc != null) {
-                // Prise Jack 3.5mm prioritaire si branchée
                 if (apc.canSwitchToPath(AudioPathControl.AUDIO_PATH_HEADSET)) {
                     apc.setAudioPath(AudioPathControl.AUDIO_PATH_HEADSET);
                 } else if (apc.canSwitchToPath(audioRoute)) {
@@ -351,9 +376,6 @@ public class ZeroLagAudioPlayer implements Runnable, PlayerListener {
         } catch (Throwable ignored) {}
     }
 
-    /**
-     * Écouteur JSR-135 PlayerListener.
-     */
     public void playerUpdate(Player player, String event, Object eventData) {
         if (PlayerListener.END_OF_MEDIA.equals(event) || PlayerListener.STOPPED.equals(event) || PlayerListener.ERROR.equals(event)) {
             chunkFinished = true;
@@ -361,7 +383,7 @@ public class ZeroLagAudioPlayer implements Runnable, PlayerListener {
     }
 
     // =========================================================================
-    // Méthodes Publiques Utilitaires
+    // Méthodes de configuration
     // =========================================================================
 
     public synchronized void setVolume(int level) {
@@ -392,6 +414,10 @@ public class ZeroLagAudioPlayer implements Runnable, PlayerListener {
 
     public boolean isSpeakerphoneOn() {
         return audioRoute == AudioPathControl.AUDIO_PATH_HANDSFREE;
+    }
+
+    public int getDetectedSampleRate() {
+        return detectedSampleRate;
     }
 
     public int getChunksReceived() {

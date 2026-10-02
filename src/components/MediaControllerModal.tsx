@@ -13,8 +13,8 @@ export const MediaControllerModal: React.FC<MediaControllerModalProps> = ({
   onMediaAction
 }) => {
   const [isPlaying, setIsPlaying] = useState(true);
-  const [title, setTitle] = useState('Starboy (ft. Daft Punk)');
-  const [artist, setArtist] = useState('The Weeknd');
+  const [title, setTitle] = useState('Flux Audio HD');
+  const [artist, setArtist] = useState('Smartphone Android');
   const [progress, setProgress] = useState(42);
   const [volume, setVolume] = useState(85);
   const [muted, setMuted] = useState(false);
@@ -28,15 +28,15 @@ export const MediaControllerModal: React.FC<MediaControllerModalProps> = ({
   };
 
   const handleNext = () => {
-    setTitle('Blinding Lights');
-    setArtist('The Weeknd');
+    setTitle('Audio Multimédia HD');
+    setArtist('Application Android');
     setProgress(0);
     if (onMediaAction) onMediaAction('NEXT');
   };
 
   const handlePrev = () => {
-    setTitle('Save Your Tears');
-    setArtist('The Weeknd');
+    setTitle('Appel Vocal & Musique');
+    setArtist('Audio Bluetooth');
     setProgress(0);
     if (onMediaAction) onMediaAction('PREVIOUS');
   };

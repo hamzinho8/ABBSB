@@ -172,8 +172,8 @@ export default function App() {
 
   // Media Player State
   const [isPlaying, setIsPlaying] = useState(false);
-  const [mediaTitle, setMediaTitle] = useState('Starboy (ft. Daft Punk)');
-  const [mediaArtist, setMediaArtist] = useState('The Weeknd');
+  const [mediaTitle, setMediaTitle] = useState('Flux Audio HD');
+  const [mediaArtist, setMediaArtist] = useState('Smartphone Android');
   const [mediaProgress, setMediaProgress] = useState(42);
   const [mediaVolume, setMediaVolume] = useState(85);
   const [isMuted, setIsMuted] = useState(false);
@@ -1100,7 +1100,7 @@ export default function App() {
                   <div className="flex items-center justify-center gap-4 mt-3">
                     <button
                       onClick={() => {
-                        setMediaTitle('Save Your Tears');
+                        setMediaTitle('Appel & Audio Précédent');
                         addLog('TX: MEDIA_PREVIOUS', 'tx');
                       }}
                       className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white cursor-pointer"
@@ -1121,7 +1121,7 @@ export default function App() {
 
                     <button
                       onClick={() => {
-                        setMediaTitle('Blinding Lights');
+                        setMediaTitle('Audio Multimédia Suivant');
                         addLog('TX: MEDIA_NEXT', 'tx');
                       }}
                       className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white cursor-pointer"
