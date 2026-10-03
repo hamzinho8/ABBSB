@@ -689,6 +689,18 @@ public class PhoneCallScreen extends MainScreen {
     
     protected boolean keyChar(char ch, int status, int time) {
         try {
+            // Touches DTMF 0-9, *, # pendant l'appel actif : envoi instantané
+            if (isActive && ((ch >= '0' && ch <= '9') || ch == '*' || ch == '#')) {
+                if (callManager != null) {
+                    callManager.sendDtmf(ch);
+                    if (hintLabel != null) {
+                        hintLabel.setText("[DTMF émis : '" + ch + "']");
+                        hintLabel.setColor(0x00E5FF);
+                    }
+                }
+                return true;
+            }
+
             // Touche M : Envoie SPEAKER_TOGGLE pour basculer le haut-parleur
             if (ch == 'm' || ch == 'M') {
                 toggleSpeaker();
@@ -787,6 +799,16 @@ public class PhoneCallScreen extends MainScreen {
                 });
             }
             if (callManager != null && callManager.getApp() != null) {
+                menu.add(new MenuItem("Nouveau SMS vers ce contact", 110, 45) {
+                    public void run() {
+                        callManager.getApp().getUIManager().pushScreen(new ComposeSmsScreen(callManager.getApp(), number, name));
+                    }
+                });
+                menu.add(new MenuItem("Boîte de Réception SMS", 110, 46) {
+                    public void run() {
+                        callManager.getApp().getUIManager().openSmsHub();
+                    }
+                });
                 menu.add(new MenuItem("Journal des Appels", 110, 50) {
                     public void run() {
                         callManager.getApp().getUIManager().openCallHistory();

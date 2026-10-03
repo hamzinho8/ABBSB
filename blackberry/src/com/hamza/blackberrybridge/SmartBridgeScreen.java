@@ -128,7 +128,7 @@ public class SmartBridgeScreen extends MainScreen {
         btnMessages = new DarkButtonField("Messages", btnW, btnH, DarkButtonField.STYLE_SLATE);
         btnMessages.setChangeListener(new FieldChangeListener() {
             public void fieldChanged(Field field, int context) {
-                app.getConnectionManager().sendData("OPEN_APP|Messages\n");
+                app.getUIManager().openSmsHub();
             }
         });
 
@@ -297,6 +297,12 @@ public class SmartBridgeScreen extends MainScreen {
         menu.add(new net.rim.device.api.ui.MenuItem("Contacts VIP", 100, 6) {
             public void run() {
                 app.getUIManager().openContacts();
+            }
+        });
+
+        menu.add(new net.rim.device.api.ui.MenuItem("Boîte SMS & Envoi", 100, 7) {
+            public void run() {
+                app.getUIManager().openSmsHub();
             }
         });
 

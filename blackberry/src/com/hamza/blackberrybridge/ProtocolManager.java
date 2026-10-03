@@ -181,6 +181,35 @@ public class ProtocolManager {
                 String countStr = parts.length >= 2 ? parts[1] : "";
                 app.getContactManager().handleContactsEnd(countStr);
             }
+            else if (command.equals("USSD_RESPONSE")) {
+                String req = (parts.length >= 2) ? parts[1] : "";
+                String b64 = (parts.length >= 3) ? parts[2] : "";
+                app.getCallManager().handleUssdResponse(req, b64);
+            }
+            else if (command.equals("SMS_INCOMING")) {
+                if (parts.length >= 6) {
+                    app.getMessageManager().handleIncomingSms(parts[1], parts[2], parts[3], parts[4], parts[5]);
+                } else if (parts.length >= 4) {
+                    app.getMessageManager().handleIncomingSms(parts[1], parts[2], "0", "", parts[3]);
+                }
+            }
+            else if (command.equals("SMS_ITEM")) {
+                if (parts.length >= 7) {
+                    app.getMessageManager().handleIncomingSms(parts[2], parts[3], parts[4], parts[5], parts[6]);
+                } else if (parts.length >= 6) {
+                    app.getMessageManager().handleIncomingSms(parts[1], parts[2], parts[3], parts[4], parts[5]);
+                }
+            }
+            else if (command.equals("SMS_SENT_OK")) {
+                String num = (parts.length >= 2) ? parts[1] : "";
+                String sim = (parts.length >= 3) ? parts[2] : "SIM 1";
+                app.getMessageManager().handleSmsSentOk(num, sim);
+            }
+            else if (command.equals("SMS_SENT_ERROR")) {
+                String num = (parts.length >= 2) ? parts[1] : "";
+                String err = (parts.length >= 3) ? parts[2] : "Erreur";
+                app.getMessageManager().handleSmsSentError(num, err);
+            }
             else if (command.equals("SMS")) {
                 if (parts.length >= 4) {
                     app.getUIManager().showNewMessagePopup(parts[1], parts[2], parts[3]);

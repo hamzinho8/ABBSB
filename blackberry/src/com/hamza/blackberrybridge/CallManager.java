@@ -2,6 +2,7 @@ package com.hamza.blackberrybridge;
 
 import java.util.Calendar;
 import java.util.Vector;
+import com.hamza.blackberrybridge.audio.FastBase64;
 import net.rim.device.api.ui.UiApplication;
 import net.rim.device.api.ui.component.Dialog;
 
@@ -671,5 +672,83 @@ public class CallManager {
     
     public SmartBridgeApp getApp() {
         return app;
+    }
+
+    /**
+     * Envoie une tonalité DTMF en cours d'appel : "DTMF|<chiffre>\n"
+     */
+    public void sendDtmf(final char key) {
+        // Rendu sonore DTMF immédiat sur le haut-parleur BlackBerry
+        try {
+            int toneNote = 60;
+            if (key >= '0' && key <= '9') toneNote = 60 + (key - '0');
+            else if (key == '*') toneNote = 71;
+            else if (key == '#') toneNote = 72;
+            javax.microedition.media.Manager.playTone(toneNote, 100, 80);
+        } catch (Throwable ignored) {}
+
+        new Thread(new Runnable() {
+            public void run() {
+                try {
+                    String packet = "DTMF|" + key + "\n";
+                    LogManager.log("CALL", "Sending DTMF: " + key);
+                    app.getConnectionManager().sendData(packet);
+                } catch (Throwable t) {
+                    LogManager.error("CALL", "DTMF send error: " + t.getMessage());
+                }
+            }
+        }).start();
+    }
+
+    /**
+     * Envoie un code USSD vers le smartphone Android :
+     * "USSD_SEND|<codeUSSD>|<slotSIM>\n" (ex: "USSD_SEND|*100#|0\n")
+     */
+    public void sendUssd(final String ussdCode, final int slotSim) {
+        if (ussdCode == null || ussdCode.trim().length() == 0) return;
+        final String cleanCode = ussdCode.trim();
+        final int targetSlot = (slotSim >= 0) ? slotSim : 0;
+
+        UiApplication.getUiApplication().invokeLater(new Runnable() {
+            public void run() {
+                Dialog.inform("Envoi de la requête USSD en cours...\n" + cleanCode + " (SIM " + (targetSlot + 1) + ")");
+            }
+        });
+
+        new Thread(new Runnable() {
+            public void run() {
+                try {
+                    String packet = "USSD_SEND|" + cleanCode + "|" + targetSlot + "\n";
+                    LogManager.log("CALL", "Sending USSD: " + cleanCode + " on SIM slot " + targetSlot);
+                    app.getConnectionManager().sendData(packet);
+                } catch (Throwable t) {
+                    LogManager.error("CALL", "USSD error: " + t.getMessage());
+                }
+            }
+        }).start();
+    }
+
+    /**
+     * Réponse USSD reçue d'Android :
+     * "USSD_RESPONSE|<requête>|<base64Texte>\n"
+     * Décode le Base64 et affiche un Dialog.inform() natif
+     */
+    public void handleUssdResponse(final String query, final String base64Text) {
+        String decoded = FastBase64.decodeString(base64Text);
+        if (decoded == null || decoded.length() == 0) {
+            decoded = (base64Text != null) ? base64Text : "";
+        }
+        final String message = decoded;
+        final String header = (query != null && query.trim().length() > 0) ? query.trim() : "Opérateur";
+
+        UiApplication.getUiApplication().invokeLater(new Runnable() {
+            public void run() {
+                try {
+                    Dialog.inform("RÉPONSE USSD [" + header + "]\n\n" + message);
+                } catch (Throwable t) {
+                    System.out.println("[BB ERROR] " + t.getMessage());
+                }
+            }
+        });
     }
 }

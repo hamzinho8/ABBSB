@@ -84,7 +84,19 @@ public class UIManager {
     }
     
     public void openDialer() {
-        pushScreen(new DialerScreen(app, app.getCallManager()));
+        pushScreen(new PhoneDialerScreen(app, app.getCallManager()));
+    }
+    
+    public void openPhoneDialer() {
+        pushScreen(new PhoneDialerScreen(app, app.getCallManager()));
+    }
+
+    public void openSmsHub() {
+        pushScreen(new SmsHubScreen(app));
+    }
+
+    public void openComposeSms(String number, String name) {
+        pushScreen(new ComposeSmsScreen(app, number, name));
     }
     
     public void openCallHistory() {

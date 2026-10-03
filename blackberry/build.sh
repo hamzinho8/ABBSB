@@ -16,6 +16,12 @@ rm -f BBSmartBridge.cod BBSmartBridge.jad BBSmartBridge.cso BBSmartBridge.csl BB
 NET_RIM_API="$SCRIPT_DIR/jde5_lib/net_rim_api.jar"
 RAPC_JAR="$SCRIPT_DIR/jde5_lib/rapc.jar"
 
+# Ensure java and ecj are found in PATH
+if [ -d "/usr/lib/jvm/java-17-openjdk-amd64/bin" ]; then
+    export PATH="/usr/lib/jvm/java-17-openjdk-amd64/bin:$PATH"
+    export JAVA_HOME="/usr/lib/jvm/java-17-openjdk-amd64"
+fi
+
 # Prefer ecj or Java 8 for CLDC 1.1 / Java 1.3 target compliance
 JAVAC_CMD="javac"
 JAVA_CMD="java"

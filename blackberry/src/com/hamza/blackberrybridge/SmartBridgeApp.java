@@ -13,6 +13,7 @@ public class SmartBridgeApp extends UiApplication {
     private SettingsManager settingsManager;
     private AudioManager audioManager;
     private CallAudioPlayerRecorder callAudioPlayerRecorder;
+    private MessageManager messageManager;
 
     public static void main(String[] args) {
         SmartBridgeApp app = new SmartBridgeApp();
@@ -31,6 +32,7 @@ public class SmartBridgeApp extends UiApplication {
             callAudioPlayerRecorder = new CallAudioPlayerRecorder(this);
             connectionManager = new ConnectionManager(uiManager, this);
             callManager = new CallManager(uiManager, this);
+            messageManager = new MessageManager(this);
             notificationManager = new NotificationManager(uiManager, this);
             contactManager = new ContactManager(this);
             mediaManager = new MediaManager(this);
@@ -53,6 +55,7 @@ public class SmartBridgeApp extends UiApplication {
     public UIManager getUIManager() { return uiManager; }
     public ConnectionManager getConnectionManager() { return connectionManager; }
     public CallManager getCallManager() { return callManager; }
+    public MessageManager getMessageManager() { return messageManager; }
     public CallAudioPlayerRecorder getCallAudioPlayerRecorder() { return callAudioPlayerRecorder; }
     public NotificationManager getNotificationManager() { return notificationManager; }
     public ContactManager getContactManager() { return contactManager; }

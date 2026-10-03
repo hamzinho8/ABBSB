@@ -1,7 +1,13 @@
 package com.hamza.blackberrybridge.audio;
 
+/**
+ * Encodeur et Décodeur Base64 ultra-rapide compatible CLDC 1.1 / Java 1.3
+ * Sans dépendance externe pour BlackBerry Curve 9300.
+ */
 public class FastBase64 {
     private static final byte[] DECODE_TABLE = new byte[256];
+    private static final char[] ENCODE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".toCharArray();
+
     static {
         for (int i = 0; i < 256; i++) DECODE_TABLE[i] = -1;
         for (int i = 'A'; i <= 'Z'; i++) DECODE_TABLE[i] = (byte)(i - 'A');
@@ -39,5 +45,58 @@ public class FastBase64 {
             if (outIdx < outLen) out[outIdx++] = (byte) (triple & 0xFF);
         }
         return out;
+    }
+
+    public static String decodeString(String s) {
+        if (s == null || s.length() == 0) return "";
+        byte[] bytes = decode(s);
+        try {
+            return new String(bytes, "UTF-8");
+        } catch (Exception e) {
+            return new String(bytes);
+        }
+    }
+
+    public static String encode(byte[] data) {
+        if (data == null || data.length == 0) return "";
+        int len = data.length;
+        int rem = len % 3;
+        int end = len - rem;
+        StringBuffer sb = new StringBuffer((len * 4) / 3 + 4);
+
+        for (int i = 0; i < end; i += 3) {
+            int b0 = data[i] & 0xFF;
+            int b1 = data[i + 1] & 0xFF;
+            int b2 = data[i + 2] & 0xFF;
+            sb.append(ENCODE_CHARS[b0 >>> 2]);
+            sb.append(ENCODE_CHARS[((b0 & 0x03) << 4) | (b1 >>> 4)]);
+            sb.append(ENCODE_CHARS[((b1 & 0x0F) << 2) | (b2 >>> 6)]);
+            sb.append(ENCODE_CHARS[b2 & 0x3F]);
+        }
+
+        if (rem == 1) {
+            int b0 = data[end] & 0xFF;
+            sb.append(ENCODE_CHARS[b0 >>> 2]);
+            sb.append(ENCODE_CHARS[(b0 & 0x03) << 4]);
+            sb.append("==");
+        } else if (rem == 2) {
+            int b0 = data[end] & 0xFF;
+            int b1 = data[end + 1] & 0xFF;
+            sb.append(ENCODE_CHARS[b0 >>> 2]);
+            sb.append(ENCODE_CHARS[((b0 & 0x03) << 4) | (b1 >>> 4)]);
+            sb.append(ENCODE_CHARS[(b1 & 0x0F) << 2]);
+            sb.append("=");
+        }
+
+        return sb.toString();
+    }
+
+    public static String encodeString(String str) {
+        if (str == null || str.length() == 0) return "";
+        try {
+            return encode(str.getBytes("UTF-8"));
+        } catch (Exception e) {
+            return encode(str.getBytes());
+        }
     }
 }
