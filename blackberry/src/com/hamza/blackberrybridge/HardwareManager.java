@@ -105,4 +105,96 @@ public class HardwareManager {
             findPhoneTimer = null;
         }
     }
+
+    private static Timer waCallTimer;
+
+    /**
+     * Alerte d'appel WhatsApp entrant :
+     * Vibration continue cadencée + LED verte clignotante
+     */
+    public static void startWhatsAppCallAlert() {
+        stopWhatsAppCallAlert();
+
+        // 1. LED Verte clignotante BlackBerry
+        try {
+            LED.setColorConfiguration(250, 250, 0x00FF00);
+            LED.setState(LED.STATE_BLINKING);
+        } catch (Throwable t) {
+            try {
+                LED.setConfiguration(250, 250, LED.BRIGHTNESS_100);
+                LED.setState(LED.STATE_BLINKING);
+            } catch (Throwable ignored) {}
+        }
+
+        // 2. Vibration cadencée (600ms toutes les 1200ms)
+        waCallTimer = new Timer();
+        waCallTimer.scheduleAtFixedRate(new TimerTask() {
+            public void run() {
+                try {
+                    if (Alert.isVibrateSupported()) {
+                        Alert.startVibrate(600);
+                    }
+                    // Tonalité douce d'appel WhatsApp entrant (F6)
+                    Manager.playTone(77, 180, 80);
+                } catch (Throwable ignored) {}
+            }
+        }, 0, 1300);
+    }
+
+    public static void stopWhatsAppCallAlert() {
+        if (waCallTimer != null) {
+            waCallTimer.cancel();
+            waCallTimer = null;
+        }
+        try {
+            if (Alert.isVibrateSupported()) {
+                Alert.stopVibrate();
+            }
+        } catch (Throwable ignored) {}
+        try {
+            LED.setState(LED.STATE_OFF);
+        } catch (Throwable ignored) {}
+    }
+
+    /**
+     * Alerte pour message WhatsApp entrant :
+     * Bip sonore doux, vibration courte et LED verte
+     */
+    public static void triggerWhatsAppMessageAlert() {
+        // 1. Vibration courte (250 ms)
+        try {
+            if (Alert.isVibrateSupported()) {
+                Alert.startVibrate(250);
+            }
+        } catch (Throwable ignored) {}
+
+        // 2. Bip doux harmonieux WhatsApp (note A6, 120 ms, volume modéré)
+        try {
+            Manager.playTone(81, 140, 75);
+        } catch (Throwable ignored) {}
+
+        // 3. LED Verte clignotante brève (2.5 secondes)
+        try {
+            if (ledTimer != null) {
+                ledTimer.cancel();
+                ledTimer = null;
+            }
+            try {
+                LED.setColorConfiguration(200, 200, 0x00FF00);
+                LED.setState(LED.STATE_BLINKING);
+            } catch (Throwable t2) {
+                LED.setConfiguration(200, 200, LED.BRIGHTNESS_100);
+                LED.setState(LED.STATE_BLINKING);
+            }
+
+            ledTimer = new Timer();
+            ledTimer.schedule(new TimerTask() {
+                public void run() {
+                    try {
+                        LED.setState(LED.STATE_OFF);
+                    } catch (Throwable ignored) {}
+                }
+            }, 2500);
+        } catch (Throwable ignored) {}
+    }
 }

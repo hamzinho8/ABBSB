@@ -210,6 +210,28 @@ public class ProtocolManager {
                 String err = (parts.length >= 3) ? parts[2] : "Erreur";
                 app.getMessageManager().handleSmsSentError(num, err);
             }
+            else if (command.equals("WHATSAPP_CALL_INCOMING")) {
+                String callId = (parts.length >= 2) ? parts[1] : ("wa_" + System.currentTimeMillis());
+                String callerName = (parts.length >= 3) ? parts[2] : "Appel WhatsApp";
+                app.getWhatsAppManager().handleIncomingCall(callId, callerName);
+            }
+            else if (command.equals("WHATSAPP_CALL_ENDED")) {
+                String callId = (parts.length >= 2) ? parts[1] : "";
+                app.getWhatsAppManager().handleCallEnded(callId);
+            }
+            else if (command.equals("WHATSAPP_MSG")) {
+                if (parts.length >= 4) {
+                    String notifId = parts[1];
+                    String senderName = parts[2];
+                    String b64Body = parts[3];
+                    String time = (parts.length >= 5) ? parts[4] : "";
+                    app.getWhatsAppManager().handleIncomingMessage(notifId, senderName, b64Body, time);
+                }
+            }
+            else if (command.equals("WHATSAPP_REPLY_OK")) {
+                String notifId = (parts.length >= 2) ? parts[1] : "";
+                app.getWhatsAppManager().handleReplyOk(notifId);
+            }
             else if (command.equals("SMS")) {
                 if (parts.length >= 4) {
                     app.getUIManager().showNewMessagePopup(parts[1], parts[2], parts[3]);

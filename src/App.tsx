@@ -36,12 +36,15 @@ import {
   Sliders, 
   Plus, 
   ChevronRight, 
-  Maximize2 
+  Maximize2,
+  MessageSquare,
+  CheckCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CallHistoryModal, CallRecord } from './components/CallHistoryModal';
 import { ContactsModal, ContactItem } from './components/ContactsModal';
 import { MediaControllerModal } from './components/MediaControllerModal';
+import { WhatsAppModal, WhatsAppMessageItem } from './components/WhatsAppModal';
 
 // Initial realistic call history (Émis, Reçus, Manqués)
 const INITIAL_CALL_RECORDS: CallRecord[] = [
@@ -140,12 +143,29 @@ const INITIAL_CONTACTS: ContactItem[] = [
 
 export default function App() {
   // Navigation / Tabs
-  const [activeTab, setActiveTab] = useState<'calls' | 'media' | 'contacts' | 'logs'>('calls');
+  const [activeTab, setActiveTab] = useState<'calls' | 'whatsapp' | 'media' | 'contacts' | 'logs'>('calls');
   
   // Modals state
   const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
   const [isContactsModalOpen, setIsContactsModalOpen] = useState(false);
   const [isCallHistoryModalOpen, setIsCallHistoryModalOpen] = useState(false);
+  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
+
+  // WhatsApp Module State
+  const [whatsAppCall, setWhatsAppCall] = useState<{
+    id: string;
+    name: string;
+    state: 'ringing' | 'connected' | 'ended';
+    duration: number;
+  } | null>(null);
+
+  const [whatsAppMessages, setWhatsAppMessages] = useState<WhatsAppMessageItem[]>([
+    { notifId: 'wa_1', senderName: 'Karim Bennani', body: 'Salut Hamza, tu es disponible pour le point d\'avancement ?', timestamp: '15:20', isOutgoing: false },
+    { notifId: 'wa_2', senderName: 'Dr. Lahlou', body: 'Les résultats sont prêts, rappelle-moi dès que tu peux.', timestamp: '14:45', isOutgoing: false },
+    { notifId: 'wa_3', senderName: 'Moi', body: 'Message reçu ! Je prépare le dossier.', timestamp: 'Hier', isOutgoing: true, isConfirmed: true },
+    { notifId: 'wa_4', senderName: 'Groupe Dev BlackBerry', body: 'Le build OS 6.0 pour Curve 9300 est validé !', timestamp: 'Hier', isOutgoing: false },
+  ]);
+  const [whatsAppReplyText, setWhatsAppReplyText] = useState('');
 
   // Call & History State
   const [callRecords, setCallRecords] = useState<CallRecord[]>(INITIAL_CALL_RECORDS);
@@ -327,6 +347,119 @@ export default function App() {
     addLog(`TX: SPEAKER_TOGGLE|${next ? '1' : '0'}`, 'tx');
   };
 
+  // WhatsApp Call Duration Timer
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+    if (whatsAppCall && whatsAppCall.state === 'connected') {
+      timer = setInterval(() => {
+        setWhatsAppCall(prev => prev ? { ...prev, duration: prev.duration + 1 } : null);
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [whatsAppCall?.state]);
+
+  // WhatsApp Protocol Methods
+  const simulateIncomingWhatsAppCall = (name = 'Karim Bennani') => {
+    const callId = 'wa_' + Date.now();
+    addLog(`RX: WHATSAPP_CALL_INCOMING|${callId}|${name}`, 'rx');
+    setWhatsAppCall({
+      id: callId,
+      name,
+      state: 'ringing',
+      duration: 0
+    });
+  };
+
+  const answerWhatsAppCall = () => {
+    if (!whatsAppCall) return;
+    addLog(`TX: WHATSAPP_CALL_ANSWER|${whatsAppCall.id}`, 'tx');
+    setWhatsAppCall(prev => prev ? { ...prev, state: 'connected', duration: 0 } : null);
+  };
+
+  const rejectWhatsAppCall = () => {
+    if (!whatsAppCall) return;
+    addLog(`TX: WHATSAPP_CALL_REJECT|${whatsAppCall.id}`, 'tx');
+    setWhatsAppCall(prev => prev ? { ...prev, state: 'ended' } : null);
+    setTimeout(() => {
+      setWhatsAppCall(null);
+    }, 1000);
+  };
+
+  const handleSendWhatsAppReply = (notifId: string, text: string) => {
+    if (!text.trim()) return;
+    const cleanText = text.trim();
+    let b64 = '';
+    try {
+      b64 = btoa(unescape(encodeURIComponent(cleanText)));
+    } catch (e) {
+      b64 = btoa(cleanText);
+    }
+    addLog(`TX: WHATSAPP_REPLY|${notifId}|${b64}`, 'tx');
+    const newMsg: WhatsAppMessageItem = {
+      notifId,
+      senderName: 'Moi',
+      body: cleanText,
+      timestamp: new Date().toTimeString().slice(0, 5),
+      isOutgoing: true,
+      isConfirmed: false
+    };
+    setWhatsAppMessages(prev => [...prev, newMsg]);
+    setWhatsAppReplyText('');
+
+    // Simulated Android auto-confirmation via WHATSAPP_REPLY_OK
+    setTimeout(() => {
+      addLog(`RX: WHATSAPP_REPLY_OK|${notifId}`, 'rx');
+      setWhatsAppMessages(prev => prev.map(m => m.notifId === notifId ? { ...m, isConfirmed: true } : m));
+    }, 1200);
+  };
+
+  const handleStartWhatsAppChat = (phone: string, text: string) => {
+    const cleanPhone = phone.trim();
+    const cleanMsg = text.trim();
+    let b64 = '';
+    try {
+      b64 = btoa(unescape(encodeURIComponent(cleanMsg)));
+    } catch (e) {
+      b64 = btoa(cleanMsg);
+    }
+    addLog(`TX: WHATSAPP_START_CHAT|${cleanPhone}|${b64}`, 'tx');
+    const newMsg: WhatsAppMessageItem = {
+      notifId: 'wa_' + Date.now(),
+      senderName: cleanPhone,
+      body: cleanMsg,
+      timestamp: new Date().toTimeString().slice(0, 5),
+      isOutgoing: true,
+      isConfirmed: true
+    };
+    setWhatsAppMessages(prev => [...prev, newMsg]);
+  };
+
+  const handleIncomingWhatsAppMessage = (sender: string, text: string) => {
+    const notifId = 'wa_' + Date.now();
+    let b64 = '';
+    try {
+      b64 = btoa(unescape(encodeURIComponent(text)));
+    } catch (e) {
+      b64 = btoa(text);
+    }
+    const time = new Date().toTimeString().slice(0, 5);
+    addLog(`RX: WHATSAPP_MSG|${notifId}|${sender}|${b64}|${time}`, 'rx');
+    setWhatsAppMessages(prev => [...prev, {
+      notifId,
+      senderName: sender,
+      body: text,
+      timestamp: time,
+      isOutgoing: false
+    }]);
+  };
+
+  const handleConfirmReply = (notifId: string) => {
+    addLog(`RX: WHATSAPP_REPLY_OK|${notifId}`, 'rx');
+    setWhatsAppMessages(prev => prev.map(m => m.notifId === notifId ? { ...m, isConfirmed: true } : m));
+  };
+
   // Filtered Call History
   const filteredHistory = callRecords.filter(record => {
     if (historyFilter === 'outgoing' && record.direction !== 'outgoing') return false;
@@ -419,6 +552,25 @@ export default function App() {
             </span>
           </button>
 
+          {/* WhatsApp Modal Button */}
+          <button
+            onClick={() => {
+              setActiveTab('whatsapp');
+              setIsWhatsAppModalOpen(true);
+            }}
+            className="px-3 py-2 rounded-xl bg-[#1B2230] hover:bg-[#232C3D] border border-emerald-500/50 text-emerald-300 text-xs font-semibold flex items-center gap-2 transition-all hover:scale-[1.02] cursor-pointer shadow-lg shadow-emerald-900/20"
+          >
+            <MessageSquare className="w-4 h-4 text-emerald-400" />
+            <span>WhatsApp</span>
+            {whatsAppCall ? (
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            ) : (
+              <span className="px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-[10px] font-mono text-emerald-300">
+                {whatsAppMessages.length}
+              </span>
+            )}
+          </button>
+
           {/* Simulate Call Button */}
           <button
             onClick={() => simulateIncomingCall()}
@@ -426,6 +578,15 @@ export default function App() {
           >
             <PhoneIncoming className="w-4 h-4 animate-bounce" />
             <span className="hidden sm:inline">Simuler Appel</span>
+          </button>
+
+          {/* Simulate WhatsApp Call Button */}
+          <button
+            onClick={() => simulateIncomingWhatsAppCall('Karim Bennani')}
+            className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-2 transition-all hover:scale-[1.02] cursor-pointer shadow-lg shadow-emerald-600/20"
+          >
+            <PhoneIncoming className="w-4 h-4" />
+            <span className="hidden sm:inline">Appel WhatsApp</span>
           </button>
         </div>
       </header>
@@ -474,8 +635,60 @@ export default function App() {
               {/* LCD Screen Content Area */}
               <div className="flex-1 p-2 flex flex-col justify-between overflow-hidden">
                 
-                {/* Condition 1: Active Call Overlay on Curve 9300 */}
-                {activeCall ? (
+                {/* Condition 0: WhatsApp Incoming Call Overlay (FullScreen WhatsAppIncomingCallScreen replica) */}
+                {whatsAppCall ? (
+                  <div className="flex-1 flex flex-col justify-between items-center text-center bg-[#0B141A] -m-2 p-2 animate-in fade-in duration-150">
+                    <div className="w-full bg-[#128C7E] py-0.5 px-2 rounded text-[9px] font-bold text-white tracking-wider flex items-center justify-center gap-1 shadow-sm">
+                      <MessageSquare className="w-3 h-3 text-emerald-300" />
+                      <span>APPEL VOCAL WHATSAPP</span>
+                    </div>
+
+                    <div className="my-auto flex flex-col items-center py-1">
+                      <div className="w-9 h-9 rounded-full bg-[#25D366] flex items-center justify-center text-white font-black text-xs shadow-md mb-1">
+                        WA
+                      </div>
+                      <div className="text-sm font-bold text-white leading-tight truncate max-w-[260px]">
+                        {whatsAppCall.name}
+                      </div>
+                      <div className="text-[10px] text-[#8696A0] mt-0.5 font-medium">
+                        {whatsAppCall.state === 'ringing' ? 'Appel entrant via Android...' : 'Audio vocal connecté (SPP 16 kHz)'}
+                      </div>
+                      {whatsAppCall.state === 'connected' && (
+                        <div className="text-base font-mono font-bold text-[#25D366] mt-1 bg-[#111B21] px-3 py-0.5 rounded border border-[#25D366]/40">
+                          {`${String(Math.floor(whatsAppCall.duration / 60)).padStart(2, '0')}:${String(whatsAppCall.duration % 60).padStart(2, '0')}`}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="w-full border-t border-[#202C33] pt-1.5 flex items-center justify-between text-[9px] px-1">
+                      {whatsAppCall.state === 'ringing' ? (
+                        <>
+                          <button
+                            onClick={answerWhatsAppCall}
+                            className="px-2 py-0.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded font-bold cursor-pointer flex items-center gap-1 shadow"
+                          >
+                            [ Verte ] Décrocher
+                          </button>
+                          <button
+                            onClick={rejectWhatsAppCall}
+                            className="px-2 py-0.5 bg-red-700 hover:bg-red-600 text-white rounded font-bold cursor-pointer flex items-center gap-1 shadow"
+                          >
+                            [ Rouge ] Rejeter
+                          </button>
+                        </>
+                      ) : (
+                        <div className="w-full flex justify-center">
+                          <button
+                            onClick={rejectWhatsAppCall}
+                            className="px-3 py-1 bg-red-700 hover:bg-red-600 text-white rounded font-bold cursor-pointer shadow text-[10px]"
+                          >
+                            [ Touche Rouge ] Raccrocher
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : activeCall ? (
                   <div className="flex-1 flex flex-col justify-between items-center text-center animate-in fade-in duration-200">
                     <div>
                       <div className={`text-[10px] font-bold uppercase tracking-wider ${activeCall.state === 'ringing' ? 'text-green-400 animate-pulse' : 'text-cyan-400'}`}>
@@ -537,6 +750,73 @@ export default function App() {
                           </button>
                         </>
                       )}
+                    </div>
+                  </div>
+                ) : activeTab === 'whatsapp' ? (
+                  /* Condition 2: WhatsApp Chat Screen (MainScreen WhatsAppChatScreen replica) */
+                  <div className="flex-1 flex flex-col justify-between bg-[#0B141A] -m-2 p-1.5 overflow-hidden text-left animate-in fade-in duration-150">
+                    <div className="bg-[#128C7E] px-2 py-1 rounded text-white flex items-center justify-between shadow-sm">
+                      <div>
+                        <div className="text-[10px] font-bold leading-tight">WHATSAPP MESSENGER</div>
+                        <div className="text-[8px] text-emerald-100">Discussion active | Clavier physique actif</div>
+                      </div>
+                      <button 
+                        onClick={() => simulateIncomingWhatsAppCall('Karim Bennani')}
+                        className="text-[8px] bg-emerald-800 hover:bg-emerald-700 px-1.5 py-0.5 rounded text-white font-bold cursor-pointer shadow-sm"
+                        title="Simuler un appel WhatsApp"
+                      >
+                        Appel WA
+                      </button>
+                    </div>
+
+                    {/* Messages list (bubbles) */}
+                    <div className="flex-1 overflow-y-auto space-y-1.5 my-1 px-0.5 max-h-[125px]">
+                      {whatsAppMessages.slice(-4).map((m, idx) => (
+                        <div key={idx} className={`flex ${m.isOutgoing ? 'justify-end' : 'justify-start'}`}>
+                          <div className={`max-w-[85%] rounded-lg p-1.5 text-[9px] shadow-sm ${
+                            m.isOutgoing 
+                              ? 'bg-[#005C4B] text-white border border-[#128C7E]' 
+                              : 'bg-[#202C33] text-gray-200 border border-[#2A3942]'
+                          }`}>
+                            <div className="flex items-center justify-between gap-1 text-[7px] text-emerald-300 font-bold mb-0.5">
+                              <span>{m.senderName}</span>
+                              <span className="text-gray-400 font-normal">{m.timestamp}</span>
+                            </div>
+                            <div className="leading-snug break-words">{m.body}</div>
+                            {m.isOutgoing && (
+                              <div className="text-right text-[7px] text-cyan-300 mt-0.5 font-bold">vv</div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Champ de réponse rapide */}
+                    <form 
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (whatsAppReplyText.trim()) {
+                          handleSendWhatsAppReply('wa_active', whatsAppReplyText.trim());
+                        }
+                      }}
+                      className="flex items-center gap-1 bg-[#1F2C34] p-1 rounded border border-[#2A3942]"
+                    >
+                      <input
+                        type="text"
+                        value={whatsAppReplyText}
+                        onChange={(e) => setWhatsAppReplyText(e.target.value)}
+                        placeholder="Répondre..."
+                        className="flex-1 bg-[#2A3942] text-white text-[9px] px-2 py-0.5 rounded border border-gray-700 focus:outline-none"
+                      />
+                      <button 
+                        type="submit"
+                        className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[8px] font-bold cursor-pointer"
+                      >
+                        Envoyer
+                      </button>
+                    </form>
+                    <div className="text-[7px] text-gray-500 text-center mt-0.5">
+                      Entrée: Envoyer (WHATSAPP_REPLY) | Rouge: Quitter
                     </div>
                   </div>
                 ) : (
@@ -605,14 +885,21 @@ export default function App() {
                         <span className="text-[7px] text-gray-400 block">{isPlaying ? 'Lecture' : 'Pause'}</span>
                       </button>
 
-                      {/* Messages Button */}
+                      {/* Messages Button (Opens WhatsApp Chat Screen) */}
                       <button
-                        onClick={() => addLog('TX: OPEN_APP|Messages', 'tx')}
-                        className="p-1.5 rounded-lg bg-[#151D28] border border-gray-700 text-gray-300 hover:bg-gray-800 text-center cursor-pointer"
+                        onClick={() => {
+                          setActiveTab('whatsapp');
+                          addLog('TX: OPEN_APP|WhatsApp', 'tx');
+                        }}
+                        className={`p-1.5 rounded-lg border text-center transition-colors cursor-pointer ${
+                          activeTab === 'whatsapp'
+                            ? 'bg-emerald-900/60 border-emerald-400 text-white'
+                            : 'bg-[#151D28] border-emerald-800/40 text-emerald-300 hover:bg-emerald-900/40'
+                        }`}
                       >
-                        <Send className="w-3.5 h-3.5 mx-auto mb-0.5 text-gray-400" />
-                        <span className="text-[9px] font-medium block leading-tight">Messages</span>
-                        <span className="text-[7px] text-gray-500 block">SMS / WA</span>
+                        <MessageSquare className="w-3.5 h-3.5 mx-auto mb-0.5 text-emerald-400" />
+                        <span className="text-[9px] font-bold block leading-tight">Messages</span>
+                        <span className="text-[7px] text-emerald-400 block font-mono">WhatsApp</span>
                       </button>
 
                       {/* Notifs Button */}
@@ -658,18 +945,23 @@ export default function App() {
               {/* Green Send Key */}
               <button 
                 onClick={() => {
-                  if (activeCall && activeCall.state === 'ringing') answerCall();
+                  if (whatsAppCall && whatsAppCall.state === 'ringing') answerWhatsAppCall();
+                  else if (activeCall && activeCall.state === 'ringing') answerCall();
+                  else if (activeTab === 'whatsapp' && whatsAppReplyText.trim()) handleSendWhatsAppReply('wa_active', whatsAppReplyText.trim());
                   else setActiveTab('calls');
                 }}
                 className="w-12 h-8 rounded-lg bg-[#112415] hover:bg-[#1a3a22] border border-green-600/70 text-green-400 flex items-center justify-center cursor-pointer shadow-md active:scale-95 transition-all"
-                title="Touche Verte (Appels / Décrocher)"
+                title="Touche Verte (Appels / Décrocher / Envoyer)"
               >
                 <Phone className="w-4 h-4" />
               </button>
 
               {/* BlackBerry Menu Key */}
               <button 
-                onClick={() => setIsCallHistoryModalOpen(true)}
+                onClick={() => {
+                  if (activeTab === 'whatsapp') setIsWhatsAppModalOpen(true);
+                  else setIsCallHistoryModalOpen(true);
+                }}
                 className="w-10 h-8 rounded-lg bg-[#1A1F29] hover:bg-[#252C3A] border border-[#333E52] text-gray-300 flex items-center justify-center cursor-pointer shadow-md active:scale-95 transition-all"
                 title="Touche Menu BlackBerry"
               >
@@ -679,11 +971,19 @@ export default function App() {
               {/* Optical Trackpad */}
               <div 
                 onClick={() => {
-                  if (activeCall) toggleMute();
-                  else setIsMediaModalOpen(true);
+                  if (whatsAppCall) {
+                    if (whatsAppCall.state === 'ringing') answerWhatsAppCall();
+                    else rejectWhatsAppCall();
+                  } else if (activeCall) {
+                    toggleMute();
+                  } else if (activeTab === 'whatsapp' && whatsAppReplyText.trim()) {
+                    handleSendWhatsAppReply('wa_active', whatsAppReplyText.trim());
+                  } else {
+                    setIsMediaModalOpen(true);
+                  }
                 }}
                 className="w-11 h-9 rounded-xl bg-gradient-to-b from-[#0F1318] to-[#040608] border-2 border-cyan-500/60 shadow-[0_0_10px_rgba(6,182,212,0.3)] flex items-center justify-center cursor-pointer active:scale-90 transition-transform"
-                title="Trackpad Optique BlackBerry"
+                title="Trackpad Optique BlackBerry (Clic pour action)"
               >
                 <div className="w-4 h-3 rounded-full bg-cyan-400/30 border border-cyan-400/50" />
               </div>
@@ -691,7 +991,8 @@ export default function App() {
               {/* Escape / Back Key */}
               <button 
                 onClick={() => {
-                  if (activeCall) endCall();
+                  if (whatsAppCall) rejectWhatsAppCall();
+                  else if (activeCall) endCall();
                   else setActiveTab('calls');
                 }}
                 className="w-10 h-8 rounded-lg bg-[#1A1F29] hover:bg-[#252C3A] border border-[#333E52] text-gray-300 flex items-center justify-center cursor-pointer shadow-md active:scale-95 transition-all"
@@ -702,9 +1003,13 @@ export default function App() {
 
               {/* Red End Call Key */}
               <button 
-                onClick={endCall}
+                onClick={() => {
+                  if (whatsAppCall) rejectWhatsAppCall();
+                  else if (activeCall) endCall();
+                  else setActiveTab('calls');
+                }}
                 className="w-12 h-8 rounded-lg bg-[#2B1414] hover:bg-[#401C1C] border border-red-600/70 text-red-400 flex items-center justify-center cursor-pointer shadow-md active:scale-95 transition-all"
-                title="Touche Rouge (Raccrocher / Refuser)"
+                title="Touche Rouge (Raccrocher / Refuser / Quitter)"
               >
                 <PhoneOff className="w-4 h-4" />
               </button>
@@ -737,7 +1042,22 @@ export default function App() {
               }`}
             >
               <PhoneCall className="w-3.5 h-3.5" />
-              <span>Appels &amp; Vrai Historique</span>
+              <span>Appels</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('whatsapp')}
+              className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                activeTab === 'whatsapp'
+                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/25'
+                  : 'text-gray-400 hover:text-white hover:bg-[#1A2230]'
+              }`}
+            >
+              <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+              <span>WhatsApp ({whatsAppMessages.length})</span>
+              {whatsAppCall && (
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              )}
             </button>
 
             <button
@@ -1025,6 +1345,180 @@ export default function App() {
                     })
                   )}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: WHATSAPP COMPANION & MESSAGERIE INSTANTANÉE */}
+          {activeTab === 'whatsapp' && (
+            <div className="flex flex-col gap-4">
+              {/* Header Box */}
+              <div className="bg-[#11161F] border border-[#232F3E] rounded-2xl p-4 sm:p-5 shadow-xl">
+                <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[#1E293B]">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-md">
+                      <MessageSquare className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-sm sm:text-base font-bold text-white">Module WhatsApp BlackBerry Curve 9300</h2>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                          RIM OS 6.0
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-gray-400">
+                        Passerelle Bluetooth SPP • Décrochage Touche Verte • Rejet Touche Rouge • Encodage Base64 UTF-8
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setIsWhatsAppModalOpen(true)}
+                      className="px-3 py-1.5 rounded-lg bg-[#1A2230] hover:bg-[#232D40] text-emerald-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border border-emerald-500/40"
+                    >
+                      <Maximize2 className="w-3.5 h-3.5" />
+                      <span>Mode Fenêtre</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Quick Simulation Triggers */}
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <button
+                    onClick={() => simulateIncomingWhatsAppCall('Karim Bennani')}
+                    className="p-3 rounded-xl bg-[#151D28] hover:bg-[#1E293B] border border-emerald-500/30 text-left transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                        <PhoneIncoming className="w-3.5 h-3.5" />
+                        Simuler Appel WA
+                      </span>
+                      <span className="text-[9px] font-mono text-gray-500">INCOMING</span>
+                    </div>
+                    <p className="text-[10px] text-gray-400">
+                      Déclenche vibration continue + LED verte + plein écran d'appel
+                    </p>
+                  </button>
+
+                  <button
+                    onClick={() => handleIncomingWhatsAppMessage('Dr. Karim Lahlou', 'Résultats d\'analyses reçus via WhatsApp.')}
+                    className="p-3 rounded-xl bg-[#151D28] hover:bg-[#1E293B] border border-emerald-500/30 text-left transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        Simuler Message WA
+                      </span>
+                      <span className="text-[9px] font-mono text-gray-500">MSG</span>
+                    </div>
+                    <p className="text-[10px] text-gray-400">
+                      Bip doux + vibration brève + bulle de dialogue
+                    </p>
+                  </button>
+
+                  <button
+                    onClick={() => handleStartWhatsAppChat('+212661223344', 'Bonjour Hamza, contact WhatsApp validé.')}
+                    className="p-3 rounded-xl bg-[#151D28] hover:bg-[#1E293B] border border-cyan-500/30 text-left transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-bold text-cyan-400 flex items-center gap-1.5">
+                        <Plus className="w-3.5 h-3.5" />
+                        Nouveau Chat WA
+                      </span>
+                      <span className="text-[9px] font-mono text-gray-500">START_CHAT</span>
+                    </div>
+                    <p className="text-[10px] text-gray-400">
+                      Ouvre une conversation depuis le Curve 9300
+                    </p>
+                  </button>
+                </div>
+              </div>
+
+              {/* Chat View & Input */}
+              <div className="bg-[#11161F] border border-[#232F3E] rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col gap-4">
+                <div className="flex items-center justify-between pb-2 border-b border-[#1E293B]">
+                  <div className="text-xs font-bold text-white flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>Fil de discussion WhatsApp Curve 9300 ({whatsAppMessages.length} messages)</span>
+                  </div>
+                  <span className="text-[10px] text-gray-400 font-mono">
+                    Bulles #005C4B &amp; #202C33
+                  </span>
+                </div>
+
+                {/* Messages Feed */}
+                <div className="bg-[#0B141A] p-4 rounded-xl border border-[#202C33] space-y-3 max-h-[340px] overflow-y-auto">
+                  {whatsAppMessages.map((m, idx) => (
+                    <div
+                      key={idx}
+                      className={`flex ${m.isOutgoing ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div
+                        className={`max-w-[80%] rounded-2xl p-3 shadow-md ${
+                          m.isOutgoing
+                            ? 'bg-[#005C4B] border border-[#128C7E] text-white rounded-br-none'
+                            : 'bg-[#202C33] border border-[#2A3942] text-gray-100 rounded-bl-none'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-3 mb-1">
+                          <span className={`text-[11px] font-bold ${m.isOutgoing ? 'text-emerald-300' : 'text-emerald-400'}`}>
+                            {m.senderName}
+                          </span>
+                          <span className="text-[10px] text-gray-400 font-mono">
+                            {m.timestamp}
+                          </span>
+                        </div>
+                        <p className="text-xs sm:text-sm whitespace-pre-wrap leading-relaxed">
+                          {m.body}
+                        </p>
+                        {m.isOutgoing && (
+                          <div className="flex items-center justify-end gap-1 mt-1 text-[10px] text-cyan-300">
+                            {m.isConfirmed ? (
+                              <>
+                                <CheckCheck className="w-3.5 h-3.5 text-cyan-400" />
+                                <span className="text-[9px]">Transmis Android (WHATSAPP_REPLY_OK)</span>
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => handleConfirmReply(m.notifId)}
+                                className="text-[9px] hover:underline text-cyan-200 cursor-pointer"
+                              >
+                                En attente d'accusé... Cliquez pour confirmer
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Quick Reply Form */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (whatsAppReplyText.trim()) {
+                      handleSendWhatsAppReply('wa_active', whatsAppReplyText.trim());
+                    }
+                  }}
+                  className="flex items-center gap-2 bg-[#1F2C34] p-2 rounded-xl border border-[#2A3942]"
+                >
+                  <input
+                    type="text"
+                    value={whatsAppReplyText}
+                    onChange={(e) => setWhatsAppReplyText(e.target.value)}
+                    placeholder="Saisir réponse rapide (Touche Entrée ou Clic Trackpad Curve 9300)..."
+                    className="flex-1 bg-[#2A3942] text-white text-xs sm:text-sm px-4 py-2.5 rounded-lg border border-gray-700 focus:outline-none focus:border-emerald-500"
+                  />
+                  <button
+                    type="submit"
+                    className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-md shadow-emerald-700/20"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Envoyer</span>
+                  </button>
+                </form>
               </div>
             </div>
           )}
@@ -1329,6 +1823,17 @@ export default function App() {
           startCall(number, name);
         }}
         onClearHistory={() => setCallRecords([])}
+      />
+
+      <WhatsAppModal
+        isOpen={isWhatsAppModalOpen}
+        onClose={() => setIsWhatsAppModalOpen(false)}
+        messages={whatsAppMessages}
+        onSendMessage={handleSendWhatsAppReply}
+        onStartNewChat={handleStartWhatsAppChat}
+        onSimulateIncomingCall={simulateIncomingWhatsAppCall}
+        onSimulateIncomingMessage={handleIncomingWhatsAppMessage}
+        onConfirmReply={handleConfirmReply}
       />
     </div>
   );

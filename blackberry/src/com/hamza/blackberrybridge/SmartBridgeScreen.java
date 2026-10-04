@@ -306,6 +306,18 @@ public class SmartBridgeScreen extends MainScreen {
             }
         });
 
+        menu.add(new net.rim.device.api.ui.MenuItem("WhatsApp Messenger", 100, 8) {
+            public void run() {
+                app.getUIManager().openWhatsAppChat();
+            }
+        });
+
+        menu.add(new net.rim.device.api.ui.MenuItem("Simuler Appel WhatsApp", 100, 9) {
+            public void run() {
+                app.getWhatsAppManager().handleIncomingCall("call_demo", "Karim Bennani");
+            }
+        });
+
         menu.add(new net.rim.device.api.ui.MenuItem("Lecteur Média", 100, 7) {
             public void run() {
                 app.getUIManager().openMedia();

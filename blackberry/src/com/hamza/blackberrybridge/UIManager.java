@@ -98,6 +98,14 @@ public class UIManager {
     public void openComposeSms(String number, String name) {
         pushScreen(new ComposeSmsScreen(app, number, name));
     }
+
+    public void openWhatsAppChat() {
+        pushScreen(new WhatsAppChatScreen(app.getWhatsAppManager()));
+    }
+
+    public void openWhatsAppCall(String callId, String name) {
+        pushScreen(new WhatsAppIncomingCallScreen(app.getWhatsAppManager(), callId, name));
+    }
     
     public void openCallHistory() {
         pushScreen(new CallHistoryScreen(app));
