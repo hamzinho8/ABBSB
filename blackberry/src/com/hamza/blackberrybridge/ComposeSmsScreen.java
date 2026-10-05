@@ -4,6 +4,8 @@ import net.rim.device.api.ui.*;
 import net.rim.device.api.ui.component.*;
 import net.rim.device.api.ui.container.*;
 import net.rim.device.api.ui.decor.*;
+import net.rim.device.api.system.Characters;
+import net.rim.device.api.ui.Keypad;
 
 /**
  * Écran de rédaction rapide de SMS pour BlackBerry Curve 9300.
@@ -72,6 +74,10 @@ public class ComposeSmsScreen extends MainScreen {
 
         messageField = new BasicEditField("", "", 500, BasicEditField.NO_NEWLINE) {
             protected boolean keyChar(char ch, int status, int time) {
+                if (ch == Characters.ENTER || ch == '\n') {
+                    doSendSms();
+                    return true;
+                }
                 boolean res = super.keyChar(ch, status, time);
                 updateCounter();
                 return res;

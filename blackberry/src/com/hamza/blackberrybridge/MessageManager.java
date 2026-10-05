@@ -80,9 +80,9 @@ public class MessageManager {
 
     /**
      * Traite un SMS entrant reçu d'Android :
-     * "SMS_INCOMING|<numéro>|<nomContact>|<slotSIM>|<timestamp>|<base64Texte>\n"
+     * "SMS_INCOMING|<numéro>|<nomContact>|<slotSIM>|<timestamp>|<texteEnClair>|<base64>\n"
      */
-    public void handleIncomingSms(String number, String contactName, String slotStr, String timestamp, String base64Text) {
+    public void handleIncomingSms(String number, String contactName, String slotStr, String timestamp, String plainText) {
         int slot = 0;
         try {
             if (slotStr != null && slotStr.trim().length() > 0) {
@@ -100,55 +100,79 @@ public class MessageManager {
             }
         } catch (Throwable ignored) {}
 
-        // Décodage Base64 du corps du texte
-        String clearBody = FastBase64.decodeString(base64Text);
-        if (clearBody == null || clearBody.length() == 0) {
-            clearBody = base64Text; // Fallback si texte brut
-        }
-
+        String body = (plainText != null) ? plainText : "";
         String displayTime = (timestamp != null && timestamp.trim().length() > 0) ? timestamp : formatCurrentTime();
         final SmsItem item = new SmsItem(
             "inc_" + System.currentTimeMillis(),
             number,
-            contactName,
+            (contactName != null && contactName.length() > 0) ? contactName : number,
             slot,
             simName,
             displayTime,
-            clearBody,
+            body,
             false
         );
 
         synchronized (this) {
             messages.insertElementAt(item, 0);
-            if (messages.size() > 60) {
+            if (messages.size() > 100) {
                 messages.removeElementAt(messages.size() - 1);
             }
         }
 
-        // Déclencher vibration physique, sonnerie et LED rouge clignotante BlackBerry
-        HardwareManager.triggerSmsAlert();
+        // Déclencher vibration physique, sonnerie et LED clignotante BlackBerry
+        try {
+            HardwareManager.triggerSmsAlert();
+        } catch (Throwable ignored) {}
 
         notifyUpdated();
         notifyNewMessage(item);
+    }
 
-        // Afficher l'alerte à l'écran
-        UiApplication.getUiApplication().invokeLater(new Runnable() {
-            public void run() {
-                try {
-                    String senderDisplay = item.getDisplayName();
-                    Dialog.inform("Nouveau SMS reçu de : " + senderDisplay + "\n[" + item.simName + "]\n\n\"" + item.getSnippet(80) + "\"");
-                } catch (Throwable t) {
-                    System.out.println("[BB ERROR] " + t.getMessage());
+    public void handleIncomingSmsMsg(String number, String contactName, String plainText, String time) {
+        handleIncomingSms(number, contactName, "0", time, plainText);
+    }
+
+    public void handleSmsItem(boolean isOutgoing, String address, String contactName, String timestamp, String plainText) {
+        final SmsItem item = new SmsItem(
+            "item_" + address + "_" + timestamp,
+            address,
+            (contactName != null && contactName.length() > 0) ? contactName : address,
+            0,
+            "SIM 1",
+            timestamp != null ? timestamp : formatCurrentTime(),
+            plainText != null ? plainText : "",
+            isOutgoing
+        );
+        synchronized (this) {
+            boolean exists = false;
+            for (int i = 0; i < messages.size(); i++) {
+                SmsItem m = (SmsItem) messages.elementAt(i);
+                if (m.senderNumber.equals(item.senderNumber) && m.body.equals(item.body) && m.timestamp.equals(item.timestamp)) {
+                    exists = true;
+                    break;
                 }
             }
-        });
+            if (!exists) {
+                messages.addElement(item);
+            }
+        }
+        notifyUpdated();
+    }
+
+    public void handleSmsListEnd(String totalCount) {
+        notifyUpdated();
     }
 
     /**
-     * Envoie un SMS rédigé au clavier :
-     * "SMS_SEND|<numéroDestinataire>|<base64Texte>|<slotSIM>\n"
+     * Envoie un SMS rédigé au clavier en clair sans encodage Base64 :
+     * "SMS_SEND|" + numeroDestinataire + "|" + messageTexteEnClair + "\n"
      */
     public void sendSms(final String recipient, final String text, final int slotSim) {
+        sendSms(recipient, text);
+    }
+
+    public void sendSms(final String recipient, final String text) {
         if (recipient == null || recipient.trim().length() == 0) {
             UiApplication.getUiApplication().invokeLater(new Runnable() {
                 public void run() { Dialog.alert("Numéro de destinataire manquant."); }
@@ -163,26 +187,16 @@ public class MessageManager {
         }
 
         final String cleanRecipient = recipient.trim();
-        final String base64Text = FastBase64.encodeString(text);
-
-        String simName = "SIM " + (slotSim + 1);
-        try {
-            if (app.getCallManager() != null) {
-                SimCard sim = app.getCallManager().getSim(slotSim);
-                if (sim != null && sim.getName() != null) {
-                    simName = sim.getName();
-                }
-            }
-        } catch (Throwable ignored) {}
+        final String cleanText = text.trim();
 
         final SmsItem outgoingItem = new SmsItem(
             "out_" + System.currentTimeMillis(),
             cleanRecipient,
             cleanRecipient,
-            slotSim,
-            simName,
+            0,
+            "SIM 1",
             formatCurrentTime(),
-            text,
+            cleanText,
             true
         );
         outgoingItem.status = "En cours d'envoi...";
@@ -196,8 +210,8 @@ public class MessageManager {
         new Thread(new Runnable() {
             public void run() {
                 try {
-                    String packet = "SMS_SEND|" + cleanRecipient + "|" + base64Text + "|" + slotSim + "\n";
-                    LogManager.log("SMS", "Sending SMS packet: " + cleanRecipient + " (slot " + slotSim + ")");
+                    String packet = "SMS_SEND|" + cleanRecipient + "|" + cleanText + "\n";
+                    LogManager.log("SMS", "Sending plain text SMS packet: " + packet.trim());
                     app.getConnectionManager().sendData(packet);
                 } catch (Throwable t) {
                     LogManager.error("SMS", "Send error: " + t.getMessage());
@@ -209,9 +223,10 @@ public class MessageManager {
     }
 
     /**
-     * Accusé d'envoi reçu d'Android : "SMS_SENT_OK|<numéro>|<simName>\n"
+     * Accusé d'envoi reçu d'Android : "SMS_SENT_OK|<numéro>|<simName>|<contactName>\n"
      */
-    public void handleSmsSentOk(final String number, final String simName) {
+    public void handleSmsSentOk(final String number, final String simName, final String contactName) {
+        final String displayName = (contactName != null && contactName.length() > 0) ? contactName : number;
         synchronized (this) {
             for (int i = 0; i < messages.size(); i++) {
                 SmsItem item = (SmsItem) messages.elementAt(i);
@@ -229,21 +244,26 @@ public class MessageManager {
         UiApplication.getUiApplication().invokeLater(new Runnable() {
             public void run() {
                 try {
-                    Dialog.inform("SMS envoyé avec succès à " + number + " (" + (simName != null ? simName : "SIM") + ")");
+                    Dialog.inform("SMS envoyé avec succès à " + displayName);
                 } catch (Throwable ignored) {}
             }
         });
+    }
+
+    public void handleSmsSentOk(final String number, final String simName) {
+        handleSmsSentOk(number, simName, number);
     }
 
     /**
      * Accusé d'échec reçu d'Android : "SMS_SENT_ERROR|<numéro>|<raison>\n"
      */
     public void handleSmsSentError(final String number, final String reason) {
+        final String err = (reason != null && reason.length() > 0) ? reason : "Échec d'envoi";
         synchronized (this) {
             for (int i = 0; i < messages.size(); i++) {
                 SmsItem item = (SmsItem) messages.elementAt(i);
                 if (item.isOutgoing && (number == null || number.length() == 0 || item.senderNumber.indexOf(number) >= 0 || number.indexOf(item.senderNumber) >= 0)) {
-                    item.status = "Échec: " + (reason != null ? reason : "Erreur réseau");
+                    item.status = "Échec d'envoi";
                     break;
                 }
             }
@@ -253,7 +273,7 @@ public class MessageManager {
         UiApplication.getUiApplication().invokeLater(new Runnable() {
             public void run() {
                 try {
-                    Dialog.alert("Erreur d'envoi SMS vers " + number + " : " + (reason != null ? reason : "Échec réseau"));
+                    Dialog.alert("Échec envoi SMS : " + err);
                 } catch (Throwable ignored) {}
             }
         });

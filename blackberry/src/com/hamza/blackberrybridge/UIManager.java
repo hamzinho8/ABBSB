@@ -8,6 +8,15 @@ public class UIManager {
     private SmartBridgeScreen mainScreen;
     private SmartBridgeApp app;
     private NotificationListScreen notifListScreen;
+    private SmsHubScreen smsHubScreen;
+
+    public void setSmsHubScreen(SmsHubScreen screen) {
+        this.smsHubScreen = screen;
+    }
+
+    public SmsHubScreen getSmsHubScreen() {
+        return smsHubScreen;
+    }
     
     public UIManager(SmartBridgeApp app) {
         this.app = app;

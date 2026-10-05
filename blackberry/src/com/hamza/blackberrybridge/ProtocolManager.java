@@ -187,27 +187,58 @@ public class ProtocolManager {
                 app.getCallManager().handleUssdResponse(req, b64);
             }
             else if (command.equals("SMS_INCOMING")) {
+                if (app.getUIManager() != null && app.getUIManager().getSmsHubScreen() != null) {
+                    app.getUIManager().getSmsHubScreen().parseIncomingPacket(message);
+                }
                 if (parts.length >= 6) {
                     app.getMessageManager().handleIncomingSms(parts[1], parts[2], parts[3], parts[4], parts[5]);
                 } else if (parts.length >= 4) {
                     app.getMessageManager().handleIncomingSms(parts[1], parts[2], "0", "", parts[3]);
                 }
             }
-            else if (command.equals("SMS_ITEM")) {
-                if (parts.length >= 7) {
-                    app.getMessageManager().handleIncomingSms(parts[2], parts[3], parts[4], parts[5], parts[6]);
-                } else if (parts.length >= 6) {
-                    app.getMessageManager().handleIncomingSms(parts[1], parts[2], parts[3], parts[4], parts[5]);
+            else if (command.equals("SMS_MSG")) {
+                if (app.getUIManager() != null && app.getUIManager().getSmsHubScreen() != null) {
+                    app.getUIManager().getSmsHubScreen().parseIncomingPacket(message);
                 }
+                String number = (parts.length >= 2) ? parts[1].trim() : "";
+                String name = (parts.length >= 3) ? parts[2].trim() : number;
+                String body = (parts.length >= 4) ? parts[3] : "";
+                String time = (parts.length >= 5) ? parts[4].trim() : "";
+                app.getMessageManager().handleIncomingSmsMsg(number, name, body, time);
+            }
+            else if (command.equals("SMS_ITEM")) {
+                if (app.getUIManager() != null && app.getUIManager().getSmsHubScreen() != null) {
+                    app.getUIManager().getSmsHubScreen().parseIncomingPacket(message);
+                }
+                boolean isOutgoing = (parts.length >= 2 && "2".equals(parts[1].trim()));
+                String addr = (parts.length >= 3) ? parts[2].trim() : "";
+                String name = (parts.length >= 4 && parts[3].trim().length() > 0) ? parts[3].trim() : addr;
+                String time = (parts.length >= 5) ? parts[4].trim() : "";
+                String body = (parts.length >= 6) ? parts[5] : "";
+                app.getMessageManager().handleSmsItem(isOutgoing, addr, name, time, body);
+            }
+            else if (command.equals("SMS_LIST_END")) {
+                if (app.getUIManager() != null && app.getUIManager().getSmsHubScreen() != null) {
+                    app.getUIManager().getSmsHubScreen().parseIncomingPacket(message);
+                }
+                String count = (parts.length >= 2) ? parts[1].trim() : "0";
+                app.getMessageManager().handleSmsListEnd(count);
             }
             else if (command.equals("SMS_SENT_OK")) {
-                String num = (parts.length >= 2) ? parts[1] : "";
-                String sim = (parts.length >= 3) ? parts[2] : "SIM 1";
-                app.getMessageManager().handleSmsSentOk(num, sim);
+                if (app.getUIManager() != null && app.getUIManager().getSmsHubScreen() != null) {
+                    app.getUIManager().getSmsHubScreen().parseIncomingPacket(message);
+                }
+                String num = (parts.length >= 2) ? parts[1].trim() : "";
+                String sim = (parts.length >= 3) ? parts[2].trim() : "SIM 1";
+                String contact = (parts.length >= 4 && parts[3].trim().length() > 0) ? parts[3].trim() : num;
+                app.getMessageManager().handleSmsSentOk(num, sim, contact);
             }
             else if (command.equals("SMS_SENT_ERROR")) {
-                String num = (parts.length >= 2) ? parts[1] : "";
-                String err = (parts.length >= 3) ? parts[2] : "Erreur";
+                if (app.getUIManager() != null && app.getUIManager().getSmsHubScreen() != null) {
+                    app.getUIManager().getSmsHubScreen().parseIncomingPacket(message);
+                }
+                String num = (parts.length >= 2) ? parts[1].trim() : "";
+                String err = (parts.length >= 3) ? parts[2].trim() : "Échec d'envoi";
                 app.getMessageManager().handleSmsSentError(num, err);
             }
             else if (command.equals("WHATSAPP_CALL_INCOMING")) {

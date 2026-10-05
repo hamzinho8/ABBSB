@@ -1,25 +1,25 @@
 Manifest-Version: 1.0
 MIDlet-Version: 1.4.0
-MIDlet-Jar-Size: 98858
+MIDlet-Jar-Size: 103545
 RIM-COD-URL-2: BBSmartBridge-2.cod
 MicroEdition-Configuration: CLDC-1.1
 MIDlet-Jar-URL: BBSmartBridge.jar
 RIM-COD-Module-Dependencies: net_rim_cldc,net_rim_bluetooth,net_rim_pdap
-RIM-COD-SHA1-2: c4 a7 eb 1e 21 51 94 72 21 f3 fe bc f8 3f aa 93 14 f9 b3 c8
+RIM-COD-SHA1-2: 2b cd 70 40 bc a5 ca a2 44 7b ce 7b 80 74 55 7d 69 65 fd 33
 RIM-COD-URL-1: BBSmartBridge-1.cod
-RIM-COD-SHA1-1: 20 87 43 20 38 08 ac 5a 1f c2 21 16 3f de be 27 d9 ef 23 bb
-RIM-COD-Size-2: 35252
+RIM-COD-SHA1-1: c8 19 18 60 ef 61 09 bc df 48 b0 8c 2f a7 3b 46 e0 53 35 c5
+RIM-COD-Size-2: 48484
 RIM-MIDlet-Flags-1: 0
-RIM-COD-Size-1: 67040
+RIM-COD-Size-1: 63248
 RIM-COD-Module-Name: BBSmartBridge
-RIM-COD-Size: 66908
+RIM-COD-Size: 66932
 MIDlet-Name: SmartBridge
-RIM-COD-Creation-Time: 1791108634
+RIM-COD-Creation-Time: 1791211290
 RIM-MIDlet-Position-1: 0
 MIDlet-1: SmartBridge,icon.png,com.hamza.blackberrybridge.SmartBridgeApp
 RIM-COD-URL: BBSmartBridge.cod
 MIDlet-Description: Android Bluetooth Companion for BlackBerry with HFP Audio Routing
-RIM-COD-SHA1: 0d e6 b3 e2 e5 bc 83 9f fc 75 cc 59 69 7d c4 36 d8 51 44 f5
+RIM-COD-SHA1: fa fe c0 57 12 b8 d3 a2 a7 8a a4 b2 4a 4b 1b bf 0e 9e f3 75
 MIDlet-Permissions: javax.microedition.io.Connector.bluetooth.client, javax.microedition.io.Connector.bluetooth.server, javax.microedition.media.control.RecordControl
 MicroEdition-Profile: MIDP-2.0
 MIDlet-Vendor: Hamza
